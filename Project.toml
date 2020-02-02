@@ -1,0 +1,10 @@
+name = "OptimalPMLTransformations"
+uuid = "8e7146f2-eb4f-11e9-33f3-abad4b927b14"
+authors = ["jondea <jondea@thedeakin.net>"]
+version = "0.1.0"
+
+[deps]
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
