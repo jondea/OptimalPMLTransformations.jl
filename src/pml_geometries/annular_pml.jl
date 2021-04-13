@@ -12,5 +12,6 @@ struct AnnularPML{T} <: PMLGeometry
     δ::T
 end
 
-polar_to_pml_coordinates(pml::AnnularPML, r, θ) = PMLCoordinates{1}((r-pml.R)/pml.δ, SVector(θ))
-pml_to_polar_coordinates(pml::AnnularPML, ν, ζ) = SVector(pml.R+ν*pml.δ, ζ)
+import Base.convert
+convert(::Val{PMLCoordinates}, pml::AnnularPML, polar_coords::PolarCoordinates) = PMLCoordinates{1}((r-pml.R)/pml.δ, SVector(θ))
+convert(::Val{PolarCoordinates}, pml::AnnularPML, polar_coords::PMLCoordinates) = SVector(pml.R+ν*pml.δ, ζ)

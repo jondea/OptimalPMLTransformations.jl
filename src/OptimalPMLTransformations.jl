@@ -23,6 +23,7 @@ export PlanarWave
 
 export Rip2D, classify_outer_boundary, find_rips
 
+include("coordinates/coordinates.jl")
 
 include("pml_geometries/pml_geometries.jl")
 
@@ -32,6 +33,6 @@ include("transformations/transformations.jl")
 
 include("integration/integration.jl")
 
-include("rips.jl")
+include("rips/rips.jl")
 
 end # module
