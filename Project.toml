@@ -4,6 +4,7 @@ authors = ["jondea <jondea@thedeakin.net>"]
 version = "0.1.0"
 
 [deps]
+Einsum = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"

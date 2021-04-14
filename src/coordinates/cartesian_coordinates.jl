@@ -1,6 +1,6 @@
 
-struct CartesianCoordinate{T,N}
+struct CartesianCoordinates{T,N}
     x::SVector{T,N}
 end
 
-CartesianCoordinate(x) = CartesianCoordinate(SVector(x))
+CartesianCoordinates(x) = CartesianCoordinates(SVector(x))

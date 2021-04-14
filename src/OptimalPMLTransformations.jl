@@ -4,6 +4,7 @@ import SpecialFunctions: hankelh1
 import StaticArrays: SVector
 import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
+import Einsum: @einsum
 
 export PMLGeometry
 export PMLCoordinates
