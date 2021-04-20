@@ -26,3 +26,7 @@ function convert(::Val{CartesianCoordinates}, pml::XAlignedRectangularPML, c::PM
     X = pml.X; δ = pml.δ
     CartesianCoordinates{2}(X + δ*tν, ζ[1])
 end
+
+tx_tν_jacobian(pml::XAlignedRectangularPML) = SDiagonal(pml.δ, 1)
+tν_ν_jacobian(::XAlignedRectangularPML, _tν) = SDiagonal(_tν, 1)
+ν_x_jacobian(pml::XAlignedRectangularPML) = inv(SDiagonal(pml.δ, 1))

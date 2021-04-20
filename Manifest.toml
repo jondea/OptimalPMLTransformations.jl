@@ -1,5 +1,11 @@
 # This file is machine-generated - editing it directly is not advised
 
+[[ArrayInterface]]
+deps = ["IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
+git-tree-sha1 = "2fbfa5f372352f92191b63976d070dc7195f47a4"
+uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+version = "3.1.7"
+
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
@@ -39,9 +45,39 @@ git-tree-sha1 = "4a6b3eee0161c89700b6c1949feae8b851da5494"
 uuid = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
 version = "0.4.1"
 
+[[EllipsisNotation]]
+deps = ["ArrayInterface"]
+git-tree-sha1 = "8041575f021cba5a099a456b4163c9a08b566a02"
+uuid = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
+version = "1.1.0"
+
+[[IfElse]]
+git-tree-sha1 = "28e837ff3e7a6c3cdb252ce49fb412c8eb3caeef"
+uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+version = "0.1.0"
+
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[IntervalSets]]
+deps = ["Dates", "EllipsisNotation", "Statistics"]
+git-tree-sha1 = "3cc368af3f110a767ac786560045dceddfc16758"
+uuid = "8197267c-284f-5f27-9208-e0e47529a953"
+version = "0.5.3"
+
+[[InverseHankelFunction]]
+deps = ["IntervalSets", "LambertW", "SpecialFunctions"]
+git-tree-sha1 = "cc5ccc5cf5902b8bc244994a1ad7f58e00b60760"
+repo-rev = "master"
+repo-url = "git@github.com:jondea/InverseHankelFunction.jl.git"
+uuid = "bec4b5d4-d8c4-11e9-2b25-9be465e100f1"
+version = "0.1.0"
+
+[[LambertW]]
+git-tree-sha1 = "2d9f4009c486ef676646bca06419ac02061c088e"
+uuid = "984bce1d-4616-540c-a9ee-88d1112d94c9"
+version = "0.4.5"
 
 [[LibGit2]]
 deps = ["Printf"]
@@ -91,6 +127,12 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
+[[Requires]]
+deps = ["UUIDs"]
+git-tree-sha1 = "4036a3bd08ac7e968e27c203d45f5fff15020621"
+uuid = "ae029012-a4dd-5104-9daa-d747884805df"
+version = "1.1.3"
+
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
@@ -113,6 +155,12 @@ deps = ["BinDeps", "BinaryProvider", "Libdl"]
 git-tree-sha1 = "3bdd374b6fd78faf0119b8c5d538788dbf910c6e"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
 version = "0.8.0"
+
+[[Static]]
+deps = ["IfElse"]
+git-tree-sha1 = "ddec5466a1d2d7e58adf9a427ba69763661aacf6"
+uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
+version = "0.2.4"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
