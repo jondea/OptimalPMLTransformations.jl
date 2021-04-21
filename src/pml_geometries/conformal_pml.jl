@@ -46,7 +46,7 @@ function convert(::Val{PMLCoordinates}, pml::ConformalPML, c::CartesianCoordinat
     ζ = ζ_from_x(pml, x)
     X = inner_pml(pml, ζ)
     p = pml_direction(pml, ζ)
-    ν = @einsum (x-X)[i]*p[i]
+    ν = @einsum x[i]*p[i]-X[i]*p[i]
     PMLCoordinates{1}(ν, (ζ,))
 end
 function convert(::Val{CartesianCoordinates}, pml::ConformalPML, c::PMLCoordinates)

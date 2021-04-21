@@ -8,6 +8,9 @@ import Einsum: @einsum
 
 export PMLGeometry
 export PMLCoordinates
+export CartesianCoordinates
+export PolarCoordinates
+export convert
 export AnnularPML,
        XAlignedRectangularPML,
        ConformalPML

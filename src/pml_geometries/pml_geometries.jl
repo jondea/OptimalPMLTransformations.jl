@@ -11,8 +11,6 @@ struct PMLGeometryDerivatives{T<:Real}
     d3x_dtν3::SVector{Complex{T}}
 end
 
-include("pml_coordinates.jl")
-
 include("annular_pml.jl")
 
 include("x_aligned_pml.jl")

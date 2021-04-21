@@ -9,7 +9,7 @@ single_hankel_mode(k,m,a=one(k)) = SingleAngularFourierMode(k,m,a)
 single_angular_fourier_mode(k,m,a=one(k)) = SingleAngularFourierMode(k,m,a)
 
 (f::SingleAngularFourierMode)(p::PolarCoordinates) = f.a *exp(im*m*p.θ) * hankel1(f.m, f.k*p.r)
-(f::SingleAngularFourierMode)(p::Coordinates, g::PMLGeometry) = f(convert(PolarCoordinates, p, g))
+(f::SingleAngularFourierMode)(p::PMLCoordinates, g::PMLGeometry) = f(convert(PolarCoordinates, p, g))
 
 
 # General case, can we do something with Jacobians?
