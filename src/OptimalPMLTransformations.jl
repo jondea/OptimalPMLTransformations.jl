@@ -1,10 +1,14 @@
 module OptimalPMLTransformations
 
 import SpecialFunctions: hankelh1
-import StaticArrays: SVector
+import StaticArrays: SVector, SMatrix, @SMatrix, SDiagonal
 import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
+import LinearAlgebra: I
 import Einsum: @einsum
+
+"Tensor contraction of two vectors"
+contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
 
 export PMLGeometry
 export PMLCoordinates
@@ -20,6 +24,13 @@ export polar_to_pml_coordinates,
        pml_to_polar_coordinates
 
 export optimal_pml_transformation
+
+export tν
+export tν_jacobian
+export tν_and_jacobian
+export tx
+export tx_jacobian
+export tx_and_jacobian
 
 export AbstractFieldFunction
 

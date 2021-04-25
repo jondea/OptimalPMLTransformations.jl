@@ -21,14 +21,14 @@ function (geom::AnnularPML)(::PMLGeometryDerivatives, coords::PMLCoordinates)
     PMLGeometryDerivatives(dx_dtν, dx_dζ, d2x_dtνdζ, d2x_dtν2, d3x_dtν3)
 end
 
-import Base.convert
-function convert(::Val{PMLCoordinates}, pml::AnnularPML, c::PolarCoordinates)
+import Base: convert
+function Base.convert(::Type{PMLCoordinates}, c::PolarCoordinates, pml::AnnularPML)
     x = c.x[1]; y = c.x[2]
     X = pml.X; δ = pml.δ
     PMLCoordinates{1}((r-R)/δ, (θ,))
 end
-function convert(::Val{PolarCoordinates}, pml::AnnularPML, c::PMLCoordinates)
-    tν = c.tν; ζ = c.ζ
+function Base.convert(::Type{PolarCoordinates}, c::PMLCoordinates, pml::AnnularPML)
+    ν = c.ν; ζ = c.ζ
     X = pml.X; δ = pml.δ
-    PolarCoordinates{2}(R + δ*tν, ζ[1])
+    PolarCoordinates{2}(R + δ*ν, ζ[1])
 end

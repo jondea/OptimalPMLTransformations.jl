@@ -15,18 +15,18 @@ function (geom::XAlignedRectangularPML)(::PMLGeometryDerivatives, coords::PMLCoo
     PMLGeometryDerivatives(dx_dtν, dx_dζ, d2x_dtνdζ, d2x_dtν2, d3x_dtν3)
 end
 
-import Base.convert
-function convert(::Val{PMLCoordinates}, pml::XAlignedRectangularPML, c::CartesianCoordinates)
+import Base: convert
+function Base.convert(::Type{PMLCoordinates}, c::CartesianCoordinates, pml::XAlignedRectangularPML)
     x = c.x[1]; y = c.x[2]
     X = pml.X; δ = pml.δ
-    PMLCoordinates{1}((x - X)/δ, (y,))
+    PMLCoordinates{1}(x - X, (y,))
 end
-function convert(::Val{CartesianCoordinates}, pml::XAlignedRectangularPML, c::PMLCoordinates)
-    tν = c.tν; ζ = c.ζ
+function Base.convert(::Type{CartesianCoordinates}, c::PMLCoordinates, pml::XAlignedRectangularPML)
+    ν = c.ν; ζ = c.ζ
     X = pml.X; δ = pml.δ
-    CartesianCoordinates{2}(X + δ*tν, ζ[1])
+    CartesianCoordinates(X + ν, ζ[1])
 end
 
-tx_tν_jacobian(pml::XAlignedRectangularPML) = SDiagonal(pml.δ, 1)
-tν_ν_jacobian(::XAlignedRectangularPML, _tν) = SDiagonal(_tν, 1)
-ν_x_jacobian(pml::XAlignedRectangularPML) = inv(SDiagonal(pml.δ, 1))
+tx_tν_jacobian(pml::XAlignedRectangularPML) = I
+tν_ν_jacobian(::XAlignedRectangularPML, ∂tν_∂ν) = SDiagonal(∂tν_∂ν, 1)
+ν_x_jacobian(pml::XAlignedRectangularPML) = I

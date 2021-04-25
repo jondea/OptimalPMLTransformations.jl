@@ -40,8 +40,8 @@ function (geom::ConformalPML)(::PMLGeometryDerivatives, coords::PMLCoordinates)
     PMLGeometryDerivatives(dx_dν, dx_dζ, d2x_dνdζ, d2x_dν2, d3x_dν3)
 end
 
-import Base.convert
-function convert(::Val{PMLCoordinates}, pml::ConformalPML, c::CartesianCoordinates)
+import Base: convert
+function Base.convert(::Type{PMLCoordinates}, c::CartesianCoordinates, pml::ConformalPML)
     x = c.x
     ζ = ζ_from_x(pml, x)
     X = inner_pml(pml, ζ)
@@ -49,7 +49,7 @@ function convert(::Val{PMLCoordinates}, pml::ConformalPML, c::CartesianCoordinat
     ν = @einsum x[i]*p[i]-X[i]*p[i]
     PMLCoordinates{1}(ν, (ζ,))
 end
-function convert(::Val{CartesianCoordinates}, pml::ConformalPML, c::PMLCoordinates)
+function Base.convert(::Type{CartesianCoordinates}, c::PMLCoordinates, pml::ConformalPML)
     ν = c.ν; ζ = c.ζ
     X = pml.X(ζ); p = pml.p(ζ)
     CartesianCoordinates{2}(X + ν*p)

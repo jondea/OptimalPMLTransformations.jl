@@ -4,13 +4,10 @@ struct PlanarWave{N,T} <: AbstractFieldFunction
     a::T
 end
 
-PlanarWave(k,a=one(first(k))) = PlanarWave(SVector(k),a)
-PlanarWave((k,θ)::NamedTuple{(:k, :θ)},a=one(first(k))) = PlanarWave{2}(SVector(k*cos(θ), k*sin(θ)),a)
+PlanarWave(k::Union{AbstractVector,Tuple},a=one(first(k))) = PlanarWave(SVector(k),a)
+PlanarWave((k,θ)::NamedTuple{(:k, :θ)},a=one(first(k))) = PlanarWave(SVector(k*cos(θ), k*sin(θ)),a)
 
-(planarwave::PlanarWave)(coords::CartesianCoordinates) = planarwave.a *exp(im*dot(coords.x, planarwave.k))
-
-"Tensor contraction of two vectors"
-contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
+(planarwave::PlanarWave)(coords::CartesianCoordinates) = planarwave.a * exp(im*contract(coords.x, planarwave.k))
 
 function (planarwave::PlanarWave)(::FieldAndDerivativesAtPoint, coords::PMLCoordinates, geom::PMLGeometry)
     k = planarwave.k

@@ -1,10 +1,10 @@
 
 function tν(planarwave::PlanarWave, pml::XAlignedRectangularPML, coords::PMLCoordinates)
-    -im/planarwave.k * log(1-coords.ν)
+    -im/planarwave.k[1] * log(1-coords.ν/pml.δ)
 end
 
 function tν_jacobian(planarwave::PlanarWave, pml::XAlignedRectangularPML, coords::PMLCoordinates)
-    im/(planarwave.k*(1-coords.ν))
+    im/(planarwave.k[1]*(pml.δ-coords.ν))
 end
 
 function tν_and_jacobian(planarwave::PlanarWave, pml::XAlignedRectangularPML, coords::PMLCoordinates)
@@ -19,9 +19,9 @@ function tx_and_jacobian(planarwave::PlanarWave, pml::XAlignedRectangularPML, co
     _tν = tν(planarwave, pml, coords)
     _tx = convert(CartesianCoordinates, PMLCoordinates(_tν, coords.ζ), pml)
 
-    tx_tν_jacobian = tx_tν_jacobian(pml) * tν_ν_jacobian(pml, _tν) * ν_x_jacobian(pml)
+    tx_x_jacobian = tx_tν_jacobian(pml) * tν_ν_jacobian(pml, tν_jacobian(planarwave, pml, coords)) * ν_x_jacobian(pml)
 
-    _tx, tx_tν_jacobian
+    _tx, tx_x_jacobian
 end
 
 function tx_and_jacobian(planarwave::PlanarWave, pml::XAlignedRectangularPML, cartesian_coords::CartesianCoordinates)

@@ -70,7 +70,7 @@ version = "0.5.3"
 deps = ["IntervalSets", "LambertW", "SpecialFunctions"]
 git-tree-sha1 = "cc5ccc5cf5902b8bc244994a1ad7f58e00b60760"
 repo-rev = "master"
-repo-url = "git@github.com:jondea/InverseHankelFunction.jl.git"
+repo-url = "https://github.com/jondea/InverseHankelFunction.jl"
 uuid = "bec4b5d4-d8c4-11e9-2b25-9be465e100f1"
 version = "0.1.0"
 
