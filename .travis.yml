@@ -1,0 +1,31 @@
+language: julia
+
+os:
+  - osx
+  - linux
+
+julia:
+  - 1.0
+  - 1.5
+  - nightly
+
+notifications:
+  email: false
+
+after_success:
+  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())';
+  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())';
+
+jobs:
+  allow_failures:
+    - julia: nightly
+    - os: osx # For some reason, the Newton method fails to converge sometimes on osx, no idea how this is possible
+  include:
+    - stage: "Documentation"
+      julia: 1.5
+      os: linux
+      script:
+        - julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate();
+                                    Pkg.develop(PackageSpec(path=pwd()))'
+        - julia --project=docs/ docs/make.jl
+      after_success: skip
