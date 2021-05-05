@@ -1,4 +1,12 @@
+# Move to the directory of this script, activate and instantiate
+# Note that OptimalPMLTransformations is loaded as a local dev pkg
+cd(@__DIR__)
+import Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
 using Documenter
+using OptimalPMLTransformations
 
 include("makeplots.jl")
 

@@ -24,7 +24,5 @@ jobs:
       julia: 1.5
       os: linux
       script:
-        - julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate();
-                                    Pkg.develop(PackageSpec(path=pwd()))'
         - julia --project=docs/ docs/make.jl
       after_success: skip
