@@ -1,11 +1,19 @@
 
-struct PlanarWave{N,T} <: AbstractFieldFunction
-    k::SVector{N,T}
-    a::T
+struct PlanarWave{N,KT,AT} <: AbstractFieldFunction
+    k::SVector{N,KT}
+    a::AT
+    function PlanarWave(k::Union{AbstractVector,Tuple},a=one(first(k)))
+        k_svec = SVector(k)
+        new{length(k_svec), eltype(k_svec), typeof(a)}(k_svec,a)
+    end
 end
 
-PlanarWave(k::Union{AbstractVector,Tuple},a=one(first(k))) = PlanarWave(SVector(k),a)
-PlanarWave((k,θ)::NamedTuple{(:k, :θ)},a=one(first(k))) = PlanarWave(SVector(k*cos(θ), k*sin(θ)),a)
+function PlanarWave(;k, θ=zero(k), a=one(k))
+    PlanarWave(SVector(k*cos(θ), k*sin(θ)),a)
+end
+
+import Base: *
+*(a::Number, u::PlanarWave) = PlanarWave(u.k, a*u.a)
 
 (planarwave::PlanarWave)(coords::CartesianCoordinates) = planarwave.a * exp(im*contract(coords.x, planarwave.k))
 

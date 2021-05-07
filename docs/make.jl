@@ -1,5 +1,5 @@
 # Move to the directory of this script, activate and instantiate
-# Note that OptimalPMLTransformations is loaded as a local dev pkg
+# Note that OptimalPMLTransformations is loaded as a local dev pkg here
 cd(@__DIR__)
 import Pkg
 Pkg.activate(".")
@@ -33,6 +33,6 @@ function myDeps()
 end
 
 deploydocs(
-    repo = "github.com/jondea/OptimalPMLTranformations.jl.git",
+    repo = "github.com/jondea/OptimalPMLTransformations.jl.git",
     deps = myDeps
 )

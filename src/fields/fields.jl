@@ -33,6 +33,8 @@ dtν_dζ(u::FieldAndDerivativesAtPoint, U::FieldAndDerivativesAtPoint, ν)::Comp
 
 include("planar_wave.jl")
 
+include("planar_wave_series.jl")
+
 include("single_angular_fourier_mode.jl")
 
 include("hankel_series.jl")

@@ -1,9 +1,17 @@
 
 # uθ(x,y,θ,k) = exp(im*k*(x*cos(θ)+y*sin(θ)))
 
-struct PlanarWaveSeries{N,T,M} <: AbstractFieldFunction
-    modes::SVector{PlanarWave{N,T},M}
+struct PlanarWaveSeries{M,N,KT,AT} <: AbstractFieldFunction
+    modes::SVector{M,PlanarWave{N,KT,AT}}
 end
+
+import Base: +
++(u1::PlanarWave{N,KT,AT}, u2::PlanarWave{N,KT,AT}) where {N,KT,AT} = PlanarWaveSeries(SVector(u1,u2))
++(u1::PlanarWaveSeries, u2::PlanarWave) = PlanarWaveSeries(vcat(u1.modes,SVector(u2)))
++(u1::PlanarWave, u2::PlanarWaveSeries) = u2 + u1
+
+(u::PlanarWaveSeries{M,N,KT,AT})(coords::CartesianCoordinates) where {M,N,KT,AT} = mapreduce(m->(m)(coords), +, u.modes; init=zero(AT))
+
 
 function two_planar_pole(x, y, x_pole, y_pole;k=4π, θ1=0.0, θ2=asin(2π/k), θ_axis=π/2)
 

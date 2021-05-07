@@ -6,7 +6,7 @@ using OptimalPMLTransformations
     θ = 0.3
     a = 3.4
     u1 = PlanarWave((k*cos(θ), k*sin(θ)),a)
-    u2 = PlanarWave((;k,θ),a)
+    u2 = PlanarWave(;k,θ,a)
 
     x = CartesianCoordinates(1.0,2.3)
 
@@ -18,7 +18,7 @@ end
     k = 3.2
     θ = 0.3
     a = 3.4
-    u = PlanarWave((;k,θ),a)
+    u = PlanarWave(;k,θ,a)
 
     @test u(CartesianCoordinates(0,0)) ≈ a
 
@@ -40,7 +40,8 @@ end
 
 @testset "Sum of planar waves" begin
 
-    PlanarWave(k,a=one(first(k))) = PlanarWave(SVector(k),a)
-    PlanarWave((k,θ)::NamedTuple{(:k, :θ)},a=one(first(k))) = PlanarWave{2}(SVector(k*cos(θ), k*sin(θ)),a)
-
+    k = 10
+    u = 0.3*PlanarWave(;k, θ=0.20) + 0.7*PlanarWave(;k, θ=-0.1)
+    @test u(CartesianCoordinates(0,0)) ≈ 1.0
+    @test !(u(CartesianCoordinates(3.4,8.9)) ≈ 1.0)
 end
