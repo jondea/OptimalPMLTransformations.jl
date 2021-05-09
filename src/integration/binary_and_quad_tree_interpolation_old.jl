@@ -43,7 +43,7 @@ left(bqtree::BinaryAndQuadTreeInterpolation) = bqtree.top_left
 right(bqtree::BinaryAndQuadTreeInterpolation) = bqtree.bottom_right
 
 function (bqtree::BinaryAndQuadTreeInterpolation)(coord::PMLCoordinates)
-    
+
     if bqtree.type == QUAD
         if coord.ν > bqtree.coord.ν
             if coord.ζ[1] > bqtree.coord.ζ[1]
@@ -54,10 +54,11 @@ function (bqtree::BinaryAndQuadTreeInterpolation)(coord::PMLCoordinates)
             else
             end
         else
+        end
     elseif bqtree.type == BINARY_THROUGH
     elseif bqtree.type == BINARY_ACROSS
     else
         return (tν, ∇tν)
     end
-    
+
 end

@@ -30,11 +30,9 @@ function optimal_pml_transformation_solve!(field_fnc::Function, bqtree::BinaryAn
     if ν_min != 0 error("bottom left corner of bqtree must be at ν = 0") end
 
     while true
-        
+
         # Find tν at centre of element
-        
-        if 
-        
+
     end
 
     return bqtree
