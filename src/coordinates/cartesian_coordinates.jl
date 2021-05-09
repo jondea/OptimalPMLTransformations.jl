@@ -1,17 +1,14 @@
 
-struct CartesianCoordinates{T,N}
-    x::SVector{T,N}
+struct CartesianCoordinates{N,T}
+    x::SVector{N,T}
+    function CartesianCoordinates(x...)
+        x_svec = SVector(x...)
+        new{length(x_svec), eltype(x_svec)}(x_svec)
+    end
 end
 
-CartesianCoordinates(x...) = CartesianCoordinates(SVector(x...))
 
-import Base: +, -, *, /, ==, ≈
-
-+(a::CartesianCoordinates, b::CartesianCoordinates) = CartesianCoordinates(a.x+b.x)
--(a::CartesianCoordinates, b::CartesianCoordinates) = CartesianCoordinates(a.x-b.x)
-*(a::Number, b::CartesianCoordinates) = CartesianCoordinates(a*b.x)
-*(b::CartesianCoordinates, a::Number) = CartesianCoordinates(b.x*a)
-/(b::CartesianCoordinates, a::Number) = CartesianCoordinates(b.x/a)
--(a::CartesianCoordinates) = CartesianCoordinates(-a.x)
+import Base: -, ==, ≈
+-(a::CartesianCoordinates, b::CartesianCoordinates) = a.x-b.x
 ≈(a::CartesianCoordinates, b::CartesianCoordinates) = a.x ≈ b.x
 ==(a::CartesianCoordinates, b::CartesianCoordinates) = a.x == b.x

@@ -23,12 +23,22 @@ end
 
 import Base: convert
 function Base.convert(::Type{PMLCoordinates}, c::PolarCoordinates, pml::AnnularPML)
-    x = c.x[1]; y = c.x[2]
-    X = pml.X; δ = pml.δ
+    R = pml.R; δ = pml.δ
     PMLCoordinates{1}((r-R)/δ, (θ,))
 end
 function Base.convert(::Type{PolarCoordinates}, c::PMLCoordinates, pml::AnnularPML)
     ν = c.ν; ζ = c.ζ
-    X = pml.X; δ = pml.δ
-    PolarCoordinates{2}(R + δ*ν, ζ[1])
+    R = pml.R; δ = pml.δ
+    PolarCoordinates(R + δ*ν, ζ[1])
 end
+
+function Base.convert(::Type{PMLCoordinates}, c::CartesianCoordinates, pml::AnnularPML)
+    convert(PMLCoordinates{1}, convert(PolarCoordinates, c), pml)
+end
+function Base.convert(::Type{CartesianCoordinates}, c::PMLCoordinates, pml::AnnularPML)
+    convert(CartesianCoordinates, convert(PolarCoordinates, c, pml))
+end
+
+import Base: ==, ≈
+==(a::PolarCoordinates, b::PolarCoordinates) = a.r == b.r && a.θ == b.θ
+≈(a::PolarCoordinates, b::PolarCoordinates) = a.r ≈ b.r && a.θ ≈ b.θ
