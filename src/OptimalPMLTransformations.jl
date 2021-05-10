@@ -36,6 +36,10 @@ export AbstractFieldFunction
 
 export PlanarWave
 
+export SingleAngularFourierMode,
+       single_hankel_mode,
+       single_angular_fourier_mode
+
 export Rip2D, classify_outer_boundary, find_rips
 
 include("coordinates/coordinates.jl")

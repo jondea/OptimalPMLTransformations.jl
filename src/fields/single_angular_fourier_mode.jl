@@ -1,16 +1,16 @@
 
-struct SingleAngularFourierMode{N,T} <: AbstractFieldFunction
-    k::T
-    m::Int
-    a::T
+struct SingleAngularFourierMode{KT<:Number, MT<:Integer, AT<:Number} <: AbstractFieldFunction
+    k::KT
+    m::MT
+    a::AT
 end
 
 single_hankel_mode(k,m,a=one(k)) = SingleAngularFourierMode(k,m,a)
 single_angular_fourier_mode(k,m,a=one(k)) = SingleAngularFourierMode(k,m,a)
 
-(f::SingleAngularFourierMode)(p::PolarCoordinates) = f.a *exp(im*m*p.θ) * hankel1(f.m, f.k*p.r)
+(f::SingleAngularFourierMode)(p::PolarCoordinates) = f.a *exp(im*f.m*p.θ) * hankelh1(f.m, f.k*p.r)
+(f::SingleAngularFourierMode)(c::CartesianCoordinates) = (f::SingleAngularFourierMode)(convert(PolarCoordinates, c))
 (f::SingleAngularFourierMode)(p::PMLCoordinates, g::PMLGeometry) = f(convert(PolarCoordinates, p, g))
-
 
 # General case, can we do something with Jacobians?
 function (f::SingleAngularFourierMode, p::PolarCoordinates, g::AnnularPML, ::FieldAndDerivativesAtPoint)
