@@ -14,7 +14,7 @@ using OptimalPMLTransformations
     pml = AnnularPML(R,δ)
 
     x1 = CartesianCoordinates(1.5, 0.0)
-    x2 = CartesianCoordinates(1.5*√2, 1.5*√2)
+    x2 = CartesianCoordinates(1.5*√2/2, 1.5*√2/2)
     x3 = CartesianCoordinates(0.0, 1.5)
     x4 = CartesianCoordinates(0.0, -1.5)
 
