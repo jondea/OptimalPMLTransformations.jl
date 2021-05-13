@@ -44,3 +44,25 @@ using OptimalPMLTransformations
     @test u1(ν4, pml) ≈ u1(p4)
 
 end
+
+@testset "Single Hankel optimal transformation" begin
+
+    k = 3.2
+    m = 4
+    a = 3.4
+    u = single_hankel_mode(k,m,a)
+
+    R = 1.0
+    δ = 1.0
+    pml = AnnularPML(R,δ)
+
+    ν = 0.7
+    θ = 0.3
+    U = u(PolarCoordinates(R, θ))
+    pml_coords = PMLCoordinates(ν, θ)
+    ν_bar = ν/pml.δ
+    _tr, J = tr_and_jacobian(u, pml, PMLCoordinates(ν, θ))
+    @test u(PolarCoordinates(_tr,θ)) ≈ U*(1-ν_bar)
+    ε = 1e-8
+
+end

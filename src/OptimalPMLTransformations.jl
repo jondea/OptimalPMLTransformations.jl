@@ -6,6 +6,7 @@ import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
 import LinearAlgebra: I
 import Einsum: @einsum
+import InverseHankelFunction: invhankelh1n, diffinvhankelh1n
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
@@ -31,6 +32,9 @@ export tν_and_jacobian
 export tx
 export tx_jacobian
 export tx_and_jacobian
+export tr
+export tr_jacobian
+export tr_and_jacobian
 
 export AbstractFieldFunction
 

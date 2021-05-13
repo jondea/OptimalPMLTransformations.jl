@@ -1,7 +1,7 @@
 
-struct PolarCoordinates{T}
+struct PolarCoordinates{RT,θT}
     "Coordinate in radial direction"
-    r::T
+    r::RT
     "Coordinate in angular direction"
-    θ::T
+    θ::θT
 end
