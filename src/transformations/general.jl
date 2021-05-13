@@ -14,13 +14,13 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     # Start with 0
     ν = ν0
-    if ν_vec != nothing
+    if isnothing(ν_vec)
         resize!(ν_vec, 1)
         ν_vec[1] = ν
     end
 
     tν = tν0
-    if tν_vec != nothing
+    if isnothing(tν_vec)
         resize!(tν_vec, 1)
         tν_vec[1] = ν
     end
@@ -31,13 +31,13 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     field_prev = field0
 
     # Add to vector if provided
-    if dtν_dν_vec != nothing
+    if isnothing(dtν_dν_vec)
         resize!(dtν_dν_vec, 1)
         dtν_dν_vec[1] = dtν_dν(field, U_field)
     end
 
     # Add to vector if provided
-    if dtν_dζ_vec != nothing
+    if isnothing(dtν_dζ_vec)
         resize!(dtν_dζ_vec, 1)
         dtν_dζ_vec[1] = dtν_dζ(field, U_field, ν)
     end
@@ -119,10 +119,10 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             && normalised_f(field) <= ε )
 
             # Add values to vectors if provided
-            if ν_vec      != nothing push!(ν_vec, ν) end
-            if tν_vec     != nothing push!(tν_vec, tν) end
-            if dtν_dν_vec != nothing push!(dtν_dν_vec, dtν_dν(field,U_field)) end
-            if dtν_dζ_vec != nothing push!(dtν_dζ_vec, dtν_dζ(field,U_field,ν)) end
+            if isnothing(ν_vec     ) push!(ν_vec, ν) end
+            if isnothing(tν_vec    ) push!(tν_vec, tν) end
+            if isnothing(dtν_dν_vec) push!(dtν_dν_vec, dtν_dν(field,U_field)) end
+            if isnothing(dtν_dζ_vec) push!(dtν_dζ_vec, dtν_dζ(field,U_field,ν)) end
 
             # Reset stepsize, try to guess what will be a good size for the next step without going past our max
             h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
