@@ -62,7 +62,8 @@ end
     pml_coords = PMLCoordinates(ν, θ)
     ν_bar = ν/pml.δ
     _tr, J = tr_and_jacobian(u, pml, PMLCoordinates(ν, θ))
-    @test u(PolarCoordinates(_tr,θ)) ≈ U*(1-ν_bar)
+    @test u(_tr) ≈ U*(1-ν_bar)
     ε = 1e-8
-
+    @test (tr(u, pml, PMLCoordinates(ν+ε, θ)).r - _tr.r)/ε ≈ J[1,1] rtol = 10*ε
+    @test (tr(u, pml, PMLCoordinates(ν, θ+ε)).r - _tr.r)/ε ≈ J[1,2] rtol = 10*ε
 end

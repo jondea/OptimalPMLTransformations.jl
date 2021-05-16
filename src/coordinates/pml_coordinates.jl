@@ -1,5 +1,5 @@
 
-struct PMLCoordinates{ZETA_DIM,T}
+struct PMLCoordinates{ZETA_DIM,T<:Number}
     "Represents the through-the-PML coordinate"
     ν::T
     "Represents the across-the-PML coordinate, for a PML in N dimensions ζ has dimension N-1"

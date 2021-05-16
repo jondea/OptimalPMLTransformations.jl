@@ -20,20 +20,16 @@ function tx(u::SingleAngularFourierMode, pml::AnnularPML, coords::PMLCoordinates
 end
 
 function tr(u::SingleAngularFourierMode, pml::AnnularPML, coords::PMLCoordinates)
-
     _tν = invhankelh1n(u.m, u.k*pml.R, 1-coords.ν/pml.δ)
-
-    # Is rt correct?
-    pml.δ*_tν/u.k
+    _tr = pml.δ*_tν/u.k
+    PolarCoordinates(_tr, coords.ζ[1])
 end
 
-
 function tr_and_jacobian(u::SingleAngularFourierMode, pml::AnnularPML, coords::PMLCoordinates)
-
     _tν, _tν_jacobian = diffinvhankelh1n(u.m, u.k*pml.R, 1-coords.ν/pml.δ)
-
-    # Is rt correct?
-    pml.δ*_tν/u.k, _tν_jacobian
+    _tr = pml.δ*_tν/u.k
+    ∂tr_∂r = -pml.δ*_tν_jacobian/u.k
+    PolarCoordinates(_tr, coords.ζ[1]), SDiagonal(∂tr_∂r, 1)
 end
 
 function tr_and_jacobian(u::SingleAngularFourierMode, pml::AnnularPML, polar_coords::PolarCoordinates)

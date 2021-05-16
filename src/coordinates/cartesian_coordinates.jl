@@ -1,5 +1,5 @@
 
-struct CartesianCoordinates{N,T}
+struct CartesianCoordinates{N,T<:Number}
     x::SVector{N,T}
     function CartesianCoordinates(x...)
         x_svec = SVector(x...)
