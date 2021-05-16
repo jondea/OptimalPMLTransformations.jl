@@ -1,15 +1,25 @@
 
-struct HankelSeries{N,T} <: AbstractFieldFunction
-    k::T
-    a::OffsetVector{T}
+struct HankelSeries{KT, AT} <: AbstractFieldFunction
+    k::KT
+    a::AT
+end
+
+import Base: +
+function +(u1::SingleAngularFourierMode, u2::SingleAngularFourierMode)
+    if (u1.k != u2.k) error("wavenumbers must be the same when adding two fields") end
+    HankelSeries(u1.k, Dict(u1.m=>u1.a, u2.m=>u2.a))
 end
 
 single_mode_contrib(r,θ,m,k,a) = a *exp(im*m*θ) * hankel1(m, k*r)
 
-function (f::HankelSeries)(r, θ)
-    h = zero(f.k)
-    for (m, a) in zip(eachindex(f.a), f.a)
-        h += a *exp(im*m*θ) * hankel1(m, f.k*r)
+function (f::HankelSeries)(p::PolarCoordinates)
+    r = p.r
+    θ = p.θ
+    k = f.k
+    h = zero(k)
+    for m in eachindex(f.a)
+        @inbounds a = f.a[m]
+        h += a * exp(im*m*θ) * hankelh1(m, k*r)
     end
     return h
 end
@@ -17,7 +27,7 @@ end
 function (f::HankelSeries, r, θ, ::FieldAndDerivativesAtPoint)
     h = zero(f.k)
     for (m, a) in zip(eachindex(f.a), f.a)
-        h += a *exp(im*m*θ) * hankel1(m, f.k*r)
+        h += a *exp(im*m*θ) * hankelh1(m, f.k*r)
     end
     return h
 end

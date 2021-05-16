@@ -1,5 +1,7 @@
 import Test: @test, @testset
 using OptimalPMLTransformations
+import SpecialFunctions: hankelh1
+import OffsetArrays: OffsetVector
 
 @testset "Single Hankel basics" begin
     k = 3.2
@@ -66,4 +68,26 @@ end
     ε = 1e-8
     @test (tr(u, pml, PMLCoordinates(ν+ε, θ)).r - _tr.r)/ε ≈ J[1,1] rtol = 10*ε
     @test (tr(u, pml, PMLCoordinates(ν, θ+ε)).r - _tr.r)/ε ≈ J[1,2] rtol = 10*ε
+end
+
+@testset "Sum of Hankel functions" begin
+
+    k = 3.7
+    a1 = 1.2 + 4.0im
+    a2 = 0.7 + 9.3im
+
+    # Test construction and evaluation from single hankels
+    u1 = single_hankel_mode(k, 0)
+    u2 = single_hankel_mode(k, 3)
+    u = a1*u1 + a2*u2
+    @test u(PolarCoordinates(1.3, 0.0)) ≈ a1*hankelh1(0, 1.3*k) + a2*hankelh1(3, 1.3*k)
+
+    # Test 3-rotation symmetry is preserved
+    @test u(PolarCoordinates(2.0, 1τ/3)) ≈ u(PolarCoordinates(2.0, 0.0))
+    @test u(PolarCoordinates(2.0, 2τ/3)) ≈ u(PolarCoordinates(2.0, 0.0))
+
+    # Test direct construction using offset vector
+    u_vec = HankelSeries(k, OffsetVector([a1, 0.0, 0.0, a2], 0:3))
+    @test u_vec(PolarCoordinates(2.4, 0.3τ)) ≈ u(PolarCoordinates(2.4, 0.3τ))
+    @test u_vec(PolarCoordinates(1.3, 0.7τ)) ≈ u(PolarCoordinates(1.3, 0.7τ))
 end

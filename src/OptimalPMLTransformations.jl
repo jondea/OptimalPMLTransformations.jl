@@ -44,6 +44,8 @@ export SingleAngularFourierMode,
        single_hankel_mode,
        single_angular_fourier_mode
 
+export HankelSeries
+
 export Rip2D, classify_outer_boundary, find_rips
 
 include("coordinates/coordinates.jl")
