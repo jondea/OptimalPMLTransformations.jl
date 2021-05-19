@@ -48,6 +48,17 @@ export HankelSeries
 
 export Rip2D, classify_outer_boundary, find_rips
 
+export gausslegendreunit,
+       int_gauss,
+       int_gauss_2d,
+       gausslegendreunittrans,
+       int_gauss_trans,
+       int_gauss_trans_2d,
+       gausslegendretrans_mid,
+       int_gauss_trans_mid,
+       gausslegendretrans_mid,
+       int_gauss_trans_2d_mid
+
 include("coordinates/coordinates.jl")
 
 include("pml_geometries/pml_geometries.jl")

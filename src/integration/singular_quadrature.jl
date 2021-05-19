@@ -1,6 +1,5 @@
 
-using FastGaussQuadrature
-using LinearAlgebra
+import FastGaussQuadrature: gausslegendre
 
 "N Gauss-Legendre nodes and weights, but rescaled for integration from 0 to 1"
 function gausslegendreunit(N)
