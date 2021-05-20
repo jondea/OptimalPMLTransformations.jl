@@ -75,6 +75,12 @@ git-tree-sha1 = "8041575f021cba5a099a456b4163c9a08b566a02"
 uuid = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
 version = "1.1.0"
 
+[[FastGaussQuadrature]]
+deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "5829b25887e53fb6730a9df2ff89ed24baa6abf6"
+uuid = "442a2c76-b920-505d-bb47-c5924d526838"
+version = "0.4.7"
+
 [[IOCapture]]
 deps = ["Logging"]
 git-tree-sha1 = "377252859f740c217b936cebcd918a44f9b53b59"
@@ -155,7 +161,7 @@ uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.3+4"
 
 [[OptimalPMLTransformations]]
-deps = ["Einsum", "InverseHankelFunction", "LinearAlgebra", "OffsetArrays", "ProgressMeter", "SpecialFunctions", "StaticArrays"]
+deps = ["Einsum", "FastGaussQuadrature", "InverseHankelFunction", "LinearAlgebra", "OffsetArrays", "ProgressMeter", "SpecialFunctions", "StaticArrays", "Tau"]
 path = ".."
 uuid = "8e7146f2-eb4f-11e9-33f3-abad4b927b14"
 version = "0.1.0"
@@ -244,6 +250,12 @@ deps = ["Dates"]
 git-tree-sha1 = "44aaac2d2aec4a850302f9aa69127c74f0c3787e"
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.3"
+
+[[Tau]]
+deps = ["Test"]
+git-tree-sha1 = "d31d780530ad6cf79bf8bff1f627801f17735691"
+uuid = "c544e3c2-d3e5-5802-ac44-44683f340e4a"
+version = "0.2.0"
 
 [[Test]]
 deps = ["Distributed", "InteractiveUtils", "Logging", "Random"]
