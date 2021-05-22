@@ -1,6 +1,4 @@
 
-optimal_pml_transformation(field_fnc::AbstractFieldFunction, pml_geometry::PMLGeometry, ν) = optimal_pml_transformation(field_fnc, pml_geometry, ν)
-
 function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ν_vec::Union{Vector{T},Nothing}=nothing,
     tν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
@@ -158,8 +156,8 @@ function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Numb
     x = [ν, ζ, real(tν), imag(tν)]
 
     # Objectives, normalised by u
-    f1(field::FieldAndDerivativesAtPoint) = field.∂u_∂tν
-    f2(field::FieldAndDerivativesAtPoint, ν) = (field.u - U_field.u*(1-ν))
+    f1(field::NamedTuple) = field.∂u_∂tν
+    f2(field::NamedTuple, ν) = (field.u - U_field.u*(1-ν))
 
     U_field = field_fnc(0.0+0.0im, ζ)
     field = field_fnc(tν, ζ)
@@ -173,8 +171,8 @@ function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Numb
         # Create Jacobian of objectives and unknowns
         df2_dζ = field.∂u_∂tζ-U_field.∂u_∂tζ*(1-ν)
         J = [
-            0               real(field.d2u_dtνdζ) real(field.∂2u_∂tν2) -imag(field.∂2u_∂tν2);
-            0               imag(field.d2u_dtνdζ) imag(field.∂2u_∂tν2)  real(field.∂2u_∂tν2);
+            0               real(field.∂2u_∂tν∂tζ) real(field.∂2u_∂tν2) -imag(field.∂2u_∂tν2);
+            0               imag(field.∂2u_∂tν∂tζ) imag(field.∂2u_∂tν2)  real(field.∂2u_∂tν2);
             real(U_field.u) real(df2_dζ)          real(field.∂u_∂tν)   -imag(field.∂u_∂tν)  ;
             imag(U_field.u) imag(df2_dζ)          imag(field.∂u_∂tν)    real(field.∂u_∂tν)
         ]

@@ -14,7 +14,7 @@ using OffsetArrays
 
     ζ = 0.2
     ν = 0.9
-    u_tν(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
+    u_tν(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
     tν, ∂tν_∂ν, ∂tν_∂ζ = optimal_pml_transformation_solve(u_tν, ν; householder_order=1)
 
     U = u_tν(0).u

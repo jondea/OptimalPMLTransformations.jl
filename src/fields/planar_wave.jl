@@ -32,9 +32,9 @@ function (planarwave::PlanarWave)(::FieldAndDerivativesAtPoint, coords::PMLCoord
     @einsum ∂u_∂tν := du_dx[i]*dx_dtν[i]
     @einsum ∂u_∂tζ := du_dx[i]*dx_dζ[i]
     @einsum ∂2u_∂tν2 := d2u_dxdx[i,j]*dx_dtν[i]*dx_dtν[j] + du_dx[i]*d2x_dtν2[i]
-    @einsum d2u_dtνdζ := d2u_dxdx[i,j]*dx_dtν[i]*dx_dζ[j] + du_dx[i]*d2x_dtνdζ[i]
+    @einsum ∂2u_∂tν∂ζ := d2u_dxdx[i,j]*dx_dtν[i]*dx_dζ[j] + du_dx[i]*d2x_dtνdζ[i]
     @einsum ∂3u_∂tν3 := (d2u_dxdxdx[i,j,m]*dx_dtν[i]*dx_dtν[j]*dx_dtν[m] + 2*d2u_dxdx[i,j]*d2x_dtν2[i]*dx_dtν[j]
                         + d2u_dxdx[i,j]*d2x_dtν2[i]*dx_dtν[j] + du_dx[i]*d3x_dtν3[i])
 
-    return FieldAndDerivativesAtPoint(u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, d2u_dtνdζ, ∂3u_∂tν3)
+    return FieldAndDerivativesAtPoint(u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂ζ, ∂3u_∂tν3)
 end

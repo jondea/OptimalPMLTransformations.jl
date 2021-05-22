@@ -22,7 +22,7 @@ function (f::HankelSeries)(p::PolarCoordinates)
     return h
 end
 
-function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}}, p::PolarCoordinates)
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}}, p::PolarCoordinates)
     r = p.r
     θ = p.θ
     k = f.k
@@ -38,25 +38,29 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :�
     ∂2u_∂tr2 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*   (H[n-2] - 2*H[n] + H[n+2])/4)
     ∂3u_∂tr3 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8)
 
-    ∂u_∂tθ   = ∑(n -> a[n] * im*n*(eⁱᶿ^n) * H[n])
+    ∂u_∂tθ     = ∑(n -> a[n] * im*n*(eⁱᶿ^n) *     H[n])
+    ∂2u_∂tr∂tθ = ∑(n -> a[n] * im*n*(eⁱᶿ^n) * k* (H[n-1] - H[n+1])/2)
 
-    return (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂3u_∂tr3)
+    return (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)
 end
 
-function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂3u_∂tν3)}}, p::PMLCoordinates, pml::AnnularPML)
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}}, p::PMLCoordinates, pml::AnnularPML)
 
     polar_coords = convert(PolarCoordinates, p, pml)
 
-    (u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}, polar_coords)
+    (u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}, polar_coords)
 
     ∂tr_∂tν = pml.δ
 
     ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
     ∂u_∂tζ = ∂u_∂tθ
     ∂2u_∂tν2 = ∂2u_∂tr2*∂tr_∂tν^2
+    ∂2u_∂tν∂tζ = ∂2u_∂tr∂tθ*∂tr_∂tν
     ∂3u_∂tν3 = ∂3u_∂tr3*∂tr_∂tν^3
-    return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂3u_∂tν3)
+    return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ, ∂3u_∂tν3)
 end
+
+diffbesselj(ν, z, h=besselj(ν, z), hm1=besselj(ν-1, z)) = hm1 - ν/z*h
 
 scattered_coef(n, k; A=1.0) = (1.0*im)^n*diffbesselj(n,k*A)/diffhankelh1(n,k*A)
 scattered_coef(ind::AbstractArray, k; A=1.0) = map(n->scattered_coef(n,k;A=A), Base.Slice(ind))

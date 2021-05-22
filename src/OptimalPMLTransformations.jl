@@ -1,12 +1,12 @@
 module OptimalPMLTransformations
 
-import SpecialFunctions: hankelh1
+import SpecialFunctions: hankelh1, besselj
 import StaticArrays: SVector, SMatrix, @SMatrix, SDiagonal
 import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
 import LinearAlgebra: I
 import Einsum: @einsum
-import InverseHankelFunction: invhankelh1n, diffinvhankelh1n
+import InverseHankelFunction: invhankelh1n, diffinvhankelh1n, diffhankelh1
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
@@ -44,7 +44,9 @@ export SingleAngularFourierMode,
        single_hankel_mode,
        single_angular_fourier_mode
 
-export HankelSeries
+export HankelSeries,
+       two_mode_pole_coef,
+       scattered_coef
 
 export Rip2D, classify_outer_boundary, find_rips
 

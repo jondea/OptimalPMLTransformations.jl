@@ -26,7 +26,7 @@ function classify_outer_boundary(field_fnc::Function, ζ₋, ζ₊; Nζ=101, ε=
 
     function check_bounded(ζ₋, ζ₊)
         ζ = (ζ₋ + ζ₊)/2
-        mapping = optimal_pml_transformation(tν->field_fnc(tν,ζ), 1.0, silent_failure=true)
+        mapping = optimal_pml_transformation_solve(tν->field_fnc(tν,ζ), 1.0, silent_failure=true)
         if mapping[4] == 1 && abs(mapping[2]) < 1e8
             print("Bounded")
         else
@@ -62,9 +62,9 @@ function find_rips(field_fnc::Function, ζ₋, ζ₊; Nζ=101, ν=1.0-1e-9, ε=1
 
     if verbose println("Calculating $Nζ samples of tnu at nu = 1 - $(1-ν)") end
     if verbose
-        tνs = @showprogress [optimal_pml_transformation(tν->field_fnc(tν,ζ), ν)[1] for ζ in ζs]
+        tνs = @showprogress [optimal_pml_transformation_solve(tν->field_fnc(tν,ζ), ν)[1] for ζ in ζs]
     else
-        tνs =               [optimal_pml_transformation(tν->field_fnc(tν,ζ), ν)[1] for ζ in ζs]
+        tνs =               [optimal_pml_transformation_solve(tν->field_fnc(tν,ζ), ν)[1] for ζ in ζs]
     end
 
     scale = sum(abs,tνs)/Nζ
@@ -95,13 +95,13 @@ function find_and_add_rips!(rips::Vector{Rip2D}, field_fnc::Function, ζ₋, ζ�
     if abs(ζ₊ - ζ₋) < ε
 
         ν_vec₋ = [0.0]; tν_vec₋ = [0.0+0.0im]; ∂tν_∂ν_vec₋ = [0.0+0.0im]
-        optimal_pml_transformation(tν->field_fnc(tν,ζ₋), ν, ν_vec₋, tν_vec₋, ∂tν_∂ν_vec₋)
+        optimal_pml_transformation_solve(tν->field_fnc(tν,ζ₋), ν, ν_vec₋, tν_vec₋, ∂tν_∂ν_vec₋)
         rip_ind₋ = argmax(abs.(∂tν_∂ν_vec₋).*(1 .- ν_vec₋))
         ν_rip₋ = ν_vec₋[rip_ind₋]
         tν_rip₋ = tν_vec₋[rip_ind₋]
 
         ν_vec₊ = [0.0]; tν_vec₊ = [0.0+0.0im]; ∂tν_∂ν_vec₊ = [0.0+0.0im]
-        optimal_pml_transformation(tν->field_fnc(tν,ζ₊), ν, ν_vec₊, tν_vec₊, ∂tν_∂ν_vec₊)
+        optimal_pml_transformation_solve(tν->field_fnc(tν,ζ₊), ν, ν_vec₊, tν_vec₊, ∂tν_∂ν_vec₊)
         rip_ind₊ = argmax(abs.(∂tν_∂ν_vec₊).*(1 .- ν_vec₊))
         ν_rip₊ = ν_vec₊[rip_ind₊]
         tν_rip₊ = tν_vec₊[rip_ind₊]
@@ -127,7 +127,7 @@ function find_and_add_rips!(rips::Vector{Rip2D}, field_fnc::Function, ζ₋, ζ�
         return
     end
 
-    tν_mid = optimal_pml_transformation(tν->field_fnc(tν,ζ_mid), ν)
+    tν_mid = optimal_pml_transformation_solve(tν->field_fnc(tν,ζ_mid), ν)[1]
 
     if abs(tν₋ - tν_mid) > δ*scale
         if verbose rip_message(abs(tν₋ - tν_mid), ζ₋, ζ_mid, true) end
@@ -145,16 +145,16 @@ function find_and_add_rips!(rips::Vector{Rip2D}, field_fnc::Function, ζ₋, ζ�
 
 end
 
-function find_rips(::SingleAngularFourierMode, arg...; verbose=true)
-    if verbose
-        println("The optimal transformation for a single angular Fourier mode has no rips")
-    end
-    return Vector{Rip2D}[]
-end
+# function find_rips(::SingleAngularFourierMode, arg...; verbose=true)
+#     if verbose
+#         println("The optimal transformation for a single angular Fourier mode has no rips")
+#     end
+#     return Vector{Rip2D}[]
+# end
 
-function find_rips(::PlanarWave, arg...; verbose=true)
-    if verbose
-        println("The optimal transformation for a planar wave has no rips")
-    end
-    return Vector{Rip2D}[]
-end
+# function find_rips(::PlanarWave, arg...; verbose=true)
+#     if verbose
+#         println("The optimal transformation for a planar wave has no rips")
+#     end
+#     return Vector{Rip2D}[]
+# end
