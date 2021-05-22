@@ -3,33 +3,33 @@ abstract type AbstractFieldFunction <: Function end
 
 struct FieldAndDerivativesAtPoint{T<:Real}
     u::Complex{T}
-    du_dtν::Complex{T}
-    du_dζ::Complex{T}
-    d2u_dtν2::Complex{T}
+    ∂u_∂tν::Complex{T}
+    ∂u_∂tζ::Complex{T}
+    ∂2u_∂tν2::Complex{T}
     d2u_dtνdζ::Complex{T}
-    d3u_dtν3::Complex{T}
+    ∂3u_∂tν3::Complex{T}
 end
 
-# Access functions
-u(field::FieldAndDerivativesAtPoint) = field.u
-du_dtν(field::FieldAndDerivativesAtPoint) = field.du_dtν
-du_dζ(field::FieldAndDerivativesAtPoint) = field.du_dζ
-d2u_dtν2(field::FieldAndDerivativesAtPoint) = field.d2u_dtν2
-d2u_dtνdζ(field::FieldAndDerivativesAtPoint) = field.d2u_dtνdζ
-d3u_dtν3(field::FieldAndDerivativesAtPoint) = field.d3u_dtν3
+# # Access functions
+# u(field::FieldAndDerivativesAtPoint) = field.u
+# ∂u_∂tν(field::FieldAndDerivativesAtPoint) = field.∂u_∂tν
+# ∂u_∂tζ(field::FieldAndDerivativesAtPoint) = field.∂u_∂tζ
+# ∂2u_∂tν2(field::FieldAndDerivativesAtPoint) = field.∂2u_∂tν2
+# d2u_dtνdζ(field::FieldAndDerivativesAtPoint) = field.d2u_dtνdζ
+# ∂3u_∂tν3(field::FieldAndDerivativesAtPoint) = field.∂3u_∂tν3
 
-import Base.(+)
-function +(f1::FieldAndDerivativesAtPoint{T}, f2::FieldAndDerivativesAtPoint{T}) where {T}
-    FieldAndDerivativesAtPoint{T}(f1.u+f2.u, f1.du_dtν+f2.du_dtν, f1.du_dζ+f2.du_dζ, f1.d2u_dtν2+f2.d2u_dtν2, f1.d2u_dtνdζ+f2.d2u_dtνdζ, f1.d3u_dtν3+f2.d3u_dtν3)
-end
+# import Base.(+)
+# function +(f1::FieldAndDerivativesAtPoint{T}, f2::FieldAndDerivativesAtPoint{T}) where {T}
+#     FieldAndDerivativesAtPoint{T}(f1.u+f2.u, f1.∂u_∂tν+f2.∂u_∂tν, f1.∂u_∂tζ+f2.∂u_∂tζ, f1.∂2u_∂tν2+f2.∂2u_∂tν2, f1.d2u_dtνdζ+f2.d2u_dtνdζ, f1.∂3u_∂tν3+f2.∂3u_∂tν3)
+# end
 
-import Base.(*)
-function *(a::Number, f::FieldAndDerivativesAtPoint{T}) where {T}
-    FieldAndDerivativesAtPoint{T}(a*f.u, a*f.du_dtν, a*f.du_dζ, a*f.d2u_dtν2, a*f.d2u_dtνdζ, a*f.d3u_dtν3)
-end
+# import Base.(*)
+# function *(a::Number, f::FieldAndDerivativesAtPoint{T}) where {T}
+#     FieldAndDerivativesAtPoint{T}(a*f.u, a*f.∂u_∂tν, a*f.∂u_∂tζ, a*f.∂2u_∂tν2, a*f.d2u_dtνdζ, a*f.∂3u_∂tν3)
+# end
 
-dtν_dν(u::FieldAndDerivativesAtPoint, U::FieldAndDerivativesAtPoint)::Complex = - U.u / u.du_dtν
-dtν_dζ(u::FieldAndDerivativesAtPoint, U::FieldAndDerivativesAtPoint, ν)::Complex = (U.du_dζ*(1-ν) - u.du_dζ) / u.du_dtν
+∂tν_∂ν(u::NamedTuple, U::NamedTuple)::Complex = - U.u / u.∂u_∂tν
+∂tν_∂ζ(u::NamedTuple, U::NamedTuple, ν::Number)::Complex = (U.∂u_∂tζ*(1-ν) - u.∂u_∂tζ) / u.∂u_∂tν
 
 include("planar_wave.jl")
 

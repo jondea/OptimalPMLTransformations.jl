@@ -19,11 +19,11 @@ import Base: *
 function (f::SingleAngularFourierMode, p::PolarCoordinates, g::AnnularPML, ::FieldAndDerivativesAtPoint)
 
     u
-    du_dtν
-    du_dζ
-    d2u_dtν2
-    d2u_dtνdζ
-    d3u_dtν3
+    ∂u_∂tν
+    ∂u_∂tζ
+    ∂2u_∂tν2
+    ∂2u_∂tνdζ
+    ∂3u_∂tν3
 
-    return FieldAndDerivativesAtPoint{T}(u, du_dtν, du_dζ, d2u_dtν2, d2u_dtνdζ, d3u_dtν3)
+    return FieldAndDerivativesAtPoint{T}(u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, d2u_dtνdζ, ∂3u_∂tν3)
 end

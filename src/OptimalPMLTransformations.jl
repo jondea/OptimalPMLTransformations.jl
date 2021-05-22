@@ -59,6 +59,7 @@ export gausslegendreunit,
        gausslegendretrans_mid,
        int_gauss_trans_2d_mid
 
+export optimal_pml_transformation_solve
 include("coordinates/coordinates.jl")
 
 include("pml_geometries/pml_geometries.jl")

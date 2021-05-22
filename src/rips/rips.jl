@@ -94,15 +94,15 @@ function find_and_add_rips!(rips::Vector{Rip2D}, field_fnc::Function, ζ₋, ζ�
 
     if abs(ζ₊ - ζ₋) < ε
 
-        ν_vec₋ = [0.0]; tν_vec₋ = [0.0+0.0im]; dtν_dν_vec₋ = [0.0+0.0im]
-        optimal_pml_transformation(tν->field_fnc(tν,ζ₋), ν, ν_vec₋, tν_vec₋, dtν_dν_vec₋)
-        rip_ind₋ = argmax(abs.(dtν_dν_vec₋).*(1 .- ν_vec₋))
+        ν_vec₋ = [0.0]; tν_vec₋ = [0.0+0.0im]; ∂tν_∂ν_vec₋ = [0.0+0.0im]
+        optimal_pml_transformation(tν->field_fnc(tν,ζ₋), ν, ν_vec₋, tν_vec₋, ∂tν_∂ν_vec₋)
+        rip_ind₋ = argmax(abs.(∂tν_∂ν_vec₋).*(1 .- ν_vec₋))
         ν_rip₋ = ν_vec₋[rip_ind₋]
         tν_rip₋ = tν_vec₋[rip_ind₋]
 
-        ν_vec₊ = [0.0]; tν_vec₊ = [0.0+0.0im]; dtν_dν_vec₊ = [0.0+0.0im]
-        optimal_pml_transformation(tν->field_fnc(tν,ζ₊), ν, ν_vec₊, tν_vec₊, dtν_dν_vec₊)
-        rip_ind₊ = argmax(abs.(dtν_dν_vec₊).*(1 .- ν_vec₊))
+        ν_vec₊ = [0.0]; tν_vec₊ = [0.0+0.0im]; ∂tν_∂ν_vec₊ = [0.0+0.0im]
+        optimal_pml_transformation(tν->field_fnc(tν,ζ₊), ν, ν_vec₊, tν_vec₊, ∂tν_∂ν_vec₊)
+        rip_ind₊ = argmax(abs.(∂tν_∂ν_vec₊).*(1 .- ν_vec₊))
         ν_rip₊ = ν_vec₊[rip_ind₊]
         tν_rip₊ = tν_vec₊[rip_ind₊]
 

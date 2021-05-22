@@ -10,8 +10,6 @@ function +(u1::SingleAngularFourierMode, u2::SingleAngularFourierMode)
     HankelSeries(u1.k, Dict(u1.m=>u1.a, u2.m=>u2.a))
 end
 
-single_mode_contrib(r,θ,m,k,a) = a *exp(im*m*θ) * hankel1(m, k*r)
-
 function (f::HankelSeries)(p::PolarCoordinates)
     r = p.r
     θ = p.θ
@@ -24,12 +22,40 @@ function (f::HankelSeries)(p::PolarCoordinates)
     return h
 end
 
-function (f::HankelSeries, r, θ, ::FieldAndDerivativesAtPoint)
-    h = zero(f.k)
-    for (m, a) in zip(eachindex(f.a), f.a)
-        h += a *exp(im*m*θ) * hankelh1(m, f.k*r)
-    end
-    return h
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}}, p::PolarCoordinates)
+    r = p.r
+    θ = p.θ
+    k = f.k
+    a = f.a
+    n_vec = (minimum(eachindex(a))-3):(maximum(eachindex(a))+3)
+    H = OffsetVector(hankelh1.(n_vec, k*r), n_vec)
+
+    eⁱᶿ = exp(im*θ)
+    ∑(fnc) = sum(fnc, eachindex(a))
+
+    u        = ∑(n -> a[n] * (eⁱᶿ^n) *         H[n])
+    ∂u_∂tr   = ∑(n -> a[n] * (eⁱᶿ^n) * k*     (H[n-1] - H[n+1])/2)
+    ∂2u_∂tr2 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*   (H[n-2] - 2*H[n] + H[n+2])/4)
+    ∂3u_∂tr3 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8)
+
+    ∂u_∂tθ   = ∑(n -> a[n] * im*n*(eⁱᶿ^n) * H[n])
+
+    return (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂3u_∂tr3)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂3u_∂tν3)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}, polar_coords)
+
+    ∂tr_∂tν = pml.δ
+
+    ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
+    ∂u_∂tζ = ∂u_∂tθ
+    ∂2u_∂tν2 = ∂2u_∂tr2*∂tr_∂tν^2
+    ∂3u_∂tν3 = ∂3u_∂tr3*∂tr_∂tν^3
+    return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂3u_∂tν3)
 end
 
 scattered_coef(n, k; A=1.0) = (1.0*im)^n*diffbesselj(n,k*A)/diffhankelh1(n,k*A)

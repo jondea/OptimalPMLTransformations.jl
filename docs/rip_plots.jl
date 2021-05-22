@@ -85,7 +85,7 @@ function add_path_to_plot_nu_steps(field_fnc::Function, tν₀::Number, tν_vec=
     while steps < N_steps && abs(ν) < ν_abs_max
 
         field = field_fnc(tν)
-        f = dtν_dν(field, U_field)
+        f = ∂tν_∂ν(field, U_field)
         tν = tν + f*h
         ν += h
         push!(tν_vec, tν)
@@ -476,7 +476,7 @@ function plot_radius_of_convergence_study()
     plot_f(f, xlims=(0,3), ylims=(-2,1), n_arrows=0, n_samples=500)
 
     function fnc!(F, r)
-        F_c = f(r[1] + r[2]*im).du_dtν
+        F_c = f(r[1] + r[2]*im).∂u_∂tν
         F[1] = real(F_c)
         F[2] = imag(F_c)
     end
@@ -624,8 +624,8 @@ function plot_error_against_n_points_integrating_through()
 
     n_max = 1000
 
-    integrand(ν, dtν_dν) = 1.0/dtν_dν + ((1-ν)^2)*dtν_dν
-    # integrand(ν, dtν_dν) = (1-ν)/dtν_dν
+    integrand(ν, ∂tν_∂ν) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂tν_∂ν
+    # integrand(ν, ∂tν_∂ν) = (1-ν)/∂tν_∂ν
 
     function integrate(n)
 
@@ -644,8 +644,8 @@ function plot_error_against_n_points_integrating_through()
         # Step through PML, adding contributions to integral
         for i = 1:n
             ν = nodes[i]
-            tν_prev, dtν_dν, dtν_dζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
-            integral += weights[i]*integrand(ν, dtν_dν)
+            tν_prev, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
+            integral += weights[i]*integrand(ν, ∂tν_∂ν)
         end
         return integral
     end
@@ -666,12 +666,12 @@ function plot_error_against_n_points_integrating_through()
 
         # Step through PML, adding contributions to integral
         ν = 0.0
-        tν_prev, dtν_dν, dtν_dζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
-        integral += h/2*(1-ν)/dtν_dν
+        tν_prev, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
+        integral += h/2*(1-ν)/∂tν_∂ν
         for i = 1:n-1
             ν = i*h
-            tν_prev, dtν_dν, dtν_dζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
-            integral += h*integrand(ν, dtν_dν)
+            tν_prev, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν;ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
+            integral += h*integrand(ν, ∂tν_∂ν)
         end
         return integral
     end
@@ -881,8 +881,8 @@ function plot_objective_near_bifurcation(; n_samples=200)
     plot_objective(tν->field_fnc(tν,ζ₋), clims=clims,
         xlims=xlims_zoomed, ylims=ylims_zoomed, n_samples=n_samples, title="", colorbar=false, size=(1000,800))
 
-    ν_vec₋ = [0.0]; tν_vec₋ = [0.0+0.0im]; dtν_dν_vec₋ = [0.0+0.0im]
-    exact_mapping_solve_adaptive_steps(tν->field_fnc(tν,ζ₋), ν_max, ν_vec₋, tν_vec₋, dtν_dν_vec₋)
+    ν_vec₋ = [0.0]; tν_vec₋ = [0.0+0.0im]; ∂tν_∂ν_vec₋ = [0.0+0.0im]
+    exact_mapping_solve_adaptive_steps(tν->field_fnc(tν,ζ₋), ν_max, ν_vec₋, tν_vec₋, ∂tν_∂ν_vec₋)
     plot!(real.(tν_vec₋), imag.(tν_vec₋), marker=(:white, :star, 16), markerstrokecolor=:transparent, color=:white, line=(:dot,4), label="")
     plot!(tickfontsize=27, guidefontsize=30, dpi=200)
     plot!(fontfamily="Latin Modern Math")
@@ -892,8 +892,8 @@ function plot_objective_near_bifurcation(; n_samples=200)
     plot_objective(tν->field_fnc(tν,ζ₊), clims=clims,
         xlims=xlims_zoomed, ylims=ylims_zoomed, n_samples=n_samples, title="", size=(1000,800))
 
-    ν_vec₊ = [0.0]; tν_vec₊ = [0.0+0.0im]; dtν_dν_vec₊ = [0.0+0.0im]
-    exact_mapping_solve_adaptive_steps(tν->field_fnc(tν,ζ₊), ν_max, ν_vec₊, tν_vec₊, dtν_dν_vec₊)
+    ν_vec₊ = [0.0]; tν_vec₊ = [0.0+0.0im]; ∂tν_∂ν_vec₊ = [0.0+0.0im]
+    exact_mapping_solve_adaptive_steps(tν->field_fnc(tν,ζ₊), ν_max, ν_vec₊, tν_vec₊, ∂tν_∂ν_vec₊)
     plot!(real.(tν_vec₊), imag.(tν_vec₊), marker=(:white, :star, 16), markerstrokecolor=:transparent, color=:white, line=(:dot,4), label="")
     plot!(tickfontsize=27, guidefontsize=30, dpi=200, right_margin=Plots.Length(:mm,50))
     plot!(fontfamily="Latin Modern Math")

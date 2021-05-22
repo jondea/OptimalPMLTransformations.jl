@@ -4,8 +4,8 @@ optimal_pml_transformation(field_fnc::AbstractFieldFunction, pml_geometry::PMLGe
 function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ν_vec::Union{Vector{T},Nothing}=nothing,
     tν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
-    dtν_dν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
-    dtν_dζ_vec::Union{Vector{Complex{T}},Nothing}=nothing;
+    ∂tν_∂ν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
+    ∂tν_∂ζ_vec::Union{Vector{Complex{T}},Nothing}=nothing;
     ν0=zero(T), tν0=zero(Complex{T}), field0=field_fnc(tν0), U_field=field_fnc(zero(Complex{T})), householder_order=3, ε=1.0e-12,
     show_trace=false, h_max=0.1, tν_jump_max=0.5, t_angle_jump_max=π/8, N_iter_max=10, silent_failure=false) where {T<:Real}
 
@@ -14,13 +14,13 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     # Start with 0
     ν = ν0
-    if isnothing(ν_vec)
+    if !isnothing(ν_vec)
         resize!(ν_vec, 1)
         ν_vec[1] = ν
     end
 
     tν = tν0
-    if isnothing(tν_vec)
+    if !isnothing(tν_vec)
         resize!(tν_vec, 1)
         tν_vec[1] = ν
     end
@@ -31,34 +31,34 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     field_prev = field0
 
     # Add to vector if provided
-    if isnothing(dtν_dν_vec)
-        resize!(dtν_dν_vec, 1)
-        dtν_dν_vec[1] = dtν_dν(field, U_field)
+    if !isnothing(∂tν_∂ν_vec)
+        resize!(∂tν_∂ν_vec, 1)
+        ∂tν_∂ν_vec[1] = ∂tν_∂ν(field, U_field)
     end
 
     # Add to vector if provided
-    if isnothing(dtν_dζ_vec)
-        resize!(dtν_dζ_vec, 1)
-        dtν_dζ_vec[1] = dtν_dζ(field, U_field, ν)
+    if !isnothing(∂tν_∂ζ_vec)
+        resize!(∂tν_∂ζ_vec, 1)
+        ∂tν_∂ζ_vec[1] = ∂tν_∂ζ(field, U_field, ν)
     end
 
-    f(field::FieldAndDerivativesAtPoint{T})::Complex{T}    = field.u - U*(1-ν)
-    df(field::FieldAndDerivativesAtPoint{T})::Complex{T}   = field.du_dtν
-    ddf(field::FieldAndDerivativesAtPoint{T})::Complex{T}  = field.d2u_dtν2
-    dddf(field::FieldAndDerivativesAtPoint{T})::Complex{T} = field.d3u_dtν3
+    f(field::NamedTuple)::Complex{T}    = field.u - U*(1-ν)
+    df(field::NamedTuple)::Complex{T}   = field.∂u_∂tν
+    ddf(field::NamedTuple)::Complex{T}  = field.∂2u_∂tν2
+    dddf(field::NamedTuple)::Complex{T} = field.∂3u_∂tν3
 
     # Rescale f for error/objective
-    normalised_f(field::FieldAndDerivativesAtPoint{T}) = abs(f(field)/U)
+    normalised_f(field::NamedTuple) = abs(f(field)/U)
 
     # Tangent of tν
-    t = dtν_dν(field_prev, U_field)
+    t = ∂tν_∂ν(field_prev, U_field)
     t_prev = t
 
     tν_prev = tν
     ν_prev  = ν
 
     # Try to guess what will be a good size for the next step without going past our max
-    h = min(h_max, 0.9*tν_jump_max/abs.(t), ν_max-ν)
+    h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
 
     # Keep going until we get to our target
     while ν < ν_max
@@ -107,7 +107,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         end
 
         # Get tangent at new point
-        t = dtν_dν(field, U_field)
+        t = ∂tν_∂ν(field, U_field)
 
         # Get angle between this and previous
         # Angle between a=re^(im θ) and b=ρe^(im φ) is angle(r/ρ e^(im (θ-φ)))
@@ -119,10 +119,10 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             && normalised_f(field) <= ε )
 
             # Add values to vectors if provided
-            if isnothing(ν_vec     ) push!(ν_vec, ν) end
-            if isnothing(tν_vec    ) push!(tν_vec, tν) end
-            if isnothing(dtν_dν_vec) push!(dtν_dν_vec, dtν_dν(field,U_field)) end
-            if isnothing(dtν_dζ_vec) push!(dtν_dζ_vec, dtν_dζ(field,U_field,ν)) end
+            if !isnothing(ν_vec     ) push!(ν_vec, ν) end
+            if !isnothing(tν_vec    ) push!(tν_vec, tν) end
+            if !isnothing(∂tν_∂ν_vec) push!(∂tν_∂ν_vec, ∂tν_∂ν(field,U_field)) end
+            if !isnothing(∂tν_∂ζ_vec) push!(∂tν_∂ζ_vec, ∂tν_∂ζ(field,U_field,ν)) end
 
             # Reset stepsize, try to guess what will be a good size for the next step without going past our max
             h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
@@ -146,7 +146,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     end
 
-    return tν, dtν_dν(field,U_field), dtν_dζ(field,U_field,ν), ν, field
+    return tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field,ν), ν, field
 end
 
 function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Number; ε=1e-12)
@@ -158,7 +158,7 @@ function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Numb
     x = [ν, ζ, real(tν), imag(tν)]
 
     # Objectives, normalised by u
-    f1(field::FieldAndDerivativesAtPoint) = field.du_dtν
+    f1(field::FieldAndDerivativesAtPoint) = field.∂u_∂tν
     f2(field::FieldAndDerivativesAtPoint, ν) = (field.u - U_field.u*(1-ν))
 
     U_field = field_fnc(0.0+0.0im, ζ)
@@ -171,12 +171,12 @@ function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Numb
     while maximum(abs.(r)) > ε*abs(U_field.u)
 
         # Create Jacobian of objectives and unknowns
-        df2_dζ = field.du_dζ-U_field.du_dζ*(1-ν)
+        df2_dζ = field.∂u_∂tζ-U_field.∂u_∂tζ*(1-ν)
         J = [
-            0               real(field.d2u_dtνdζ) real(field.d2u_dtν2) -imag(field.d2u_dtν2);
-            0               imag(field.d2u_dtνdζ) imag(field.d2u_dtν2)  real(field.d2u_dtν2);
-            real(U_field.u) real(df2_dζ)          real(field.du_dtν)   -imag(field.du_dtν)  ;
-            imag(U_field.u) imag(df2_dζ)          imag(field.du_dtν)    real(field.du_dtν)
+            0               real(field.d2u_dtνdζ) real(field.∂2u_∂tν2) -imag(field.∂2u_∂tν2);
+            0               imag(field.d2u_dtνdζ) imag(field.∂2u_∂tν2)  real(field.∂2u_∂tν2);
+            real(U_field.u) real(df2_dζ)          real(field.∂u_∂tν)   -imag(field.∂u_∂tν)  ;
+            imag(U_field.u) imag(df2_dζ)          imag(field.∂u_∂tν)    real(field.∂u_∂tν)
         ]
 
         # Perform Newton step
