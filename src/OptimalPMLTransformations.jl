@@ -38,6 +38,8 @@ export tr_and_jacobian
 
 export AbstractFieldFunction
 
+export ∂u_∂tr
+
 export PlanarWave
 
 export SingleAngularFourierMode,

@@ -10,6 +10,15 @@ function +(u1::SingleAngularFourierMode, u2::SingleAngularFourierMode)
     HankelSeries(u1.k, Dict(u1.m=>u1.a, u2.m=>u2.a))
 end
 
+function pad(a::AbstractUnitRange, n::Integer)
+    (minimum(a)-n):(maximum(a)+n)
+end
+
+function padded_hankelh1_vec(indices, z, padding)
+    n_vec = pad(indices, padding)
+    return OffsetVector(hankelh1.(n_vec, z), n_vec)
+end
+
 function (f::HankelSeries)(p::PolarCoordinates)
     r = p.r
     θ = p.θ
@@ -27,8 +36,7 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :�
     θ = p.θ
     k = f.k
     a = f.a
-    n_vec = (minimum(eachindex(a))-3):(maximum(eachindex(a))+3)
-    H = OffsetVector(hankelh1.(n_vec, k*r), n_vec)
+    H = padded_hankelh1_vec(eachindex(a), k*r, 3)
 
     eⁱᶿ = exp(im*θ)
     ∑(fnc) = sum(fnc, eachindex(a))
@@ -42,6 +50,37 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :�
     ∂2u_∂tr∂tθ = ∑(n -> a[n] * im*n*(eⁱᶿ^n) * k* (H[n-1] - H[n+1])/2)
 
     return (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)
+end
+
+
+function ∂u_∂tr(f::HankelSeries, p::PolarCoordinates)
+    r = p.r
+    θ = p.θ
+    k = f.k
+    a = f.a
+    H = padded_hankelh1_vec(eachindex(a), k*r, 1)
+
+    eⁱᶿ = exp(im*θ)
+    ∑(fnc) = sum(fnc, eachindex(a))
+
+    return ∑(n -> a[n] * (eⁱᶿ^n) * k*     (H[n-1] - H[n+1])/2)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr)}}, p::PolarCoordinates)
+    r = p.r
+    θ = p.θ
+    k = f.k
+    a = f.a
+    n_vec = (minimum(eachindex(a))-1):(maximum(eachindex(a))+1)
+    H = OffsetVector(hankelh1.(n_vec, k*r), n_vec)
+
+    eⁱᶿ = exp(im*θ)
+    ∑(fnc) = sum(fnc, eachindex(a))
+
+    u        = ∑(n -> a[n] * (eⁱᶿ^n) *         H[n])
+    ∂u_∂tr   = ∑(n -> a[n] * (eⁱᶿ^n) * k*     (H[n-1] - H[n+1])/2)
+
+    return (;u, ∂u_∂tr)
 end
 
 function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}}, p::PMLCoordinates, pml::AnnularPML)

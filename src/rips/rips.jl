@@ -18,6 +18,11 @@ function rip_message(jump, ζ₋, ζ₊, descending)
     println()
 end
 
+function classify_outer_boundary(u::AbstractFieldFunction, pml::PMLGeometry, ζ₋, ζ₊; kwargs...)
+    u_pml_coords(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,complex(ζ)), pml)
+    return classify_outer_boundary(u_pml_coords, ζ₋, ζ₊; kwargs...)
+end
+
 function classify_outer_boundary(field_fnc::Function, ζ₋, ζ₊; Nζ=101, ε=1e-5, δ=1e-1, verbose=true)
 
     rips = find_rips(field_fnc, ζ₋, ζ₊; Nζ=Nζ, ν=1.0-1e-9, ε=ε, δ=δ, verbose=false)

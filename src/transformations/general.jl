@@ -1,4 +1,10 @@
 
+function optimal_pml_transformation_solve(u::AbstractFieldFunction, pml::PMLGeometry, ν_max, ζ, args...; kwargs...)
+    u_pml_coords(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
+    return optimal_pml_transformation_solve(u_pml_coords, ν_max, args...;kwargs...)
+end
+
+
 function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ν_vec::Union{Vector{T},Nothing}=nothing,
     tν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
