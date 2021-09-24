@@ -4,9 +4,10 @@ import SpecialFunctions: hankelh1, besselj
 import StaticArrays: SVector, SMatrix, @SMatrix, SDiagonal
 import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
-import LinearAlgebra: I
+import LinearAlgebra: I, norm
 import Einsum: @einsum
 import InverseHankelFunction: invhankelh1n, diffinvhankelh1n, diffhankelh1
+import CubicHermiteSpline: CubicHermiteSplineInterpolation
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
@@ -50,6 +51,9 @@ export HankelSeries,
        two_mode_pole_coef,
        scattered_coef
 
+export interpolate,
+       ∂tν_∂ν
+
 export Rip2D, classify_outer_boundary, find_rips
 
 export gausslegendreunit,
@@ -69,6 +73,8 @@ include("coordinates/coordinates.jl")
 include("pml_geometries/pml_geometries.jl")
 
 include("fields/fields.jl")
+
+include("interpolation.jl")
 
 include("transformations/transformations.jl")
 
