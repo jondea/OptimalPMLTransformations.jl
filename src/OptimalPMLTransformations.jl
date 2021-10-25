@@ -7,7 +7,9 @@ import OffsetArrays: OffsetVector
 import LinearAlgebra: I, norm
 import Einsum: @einsum
 import InverseHankelFunction: invhankelh1n, diffinvhankelh1n, diffhankelh1
+import CubicHermiteSpline
 import CubicHermiteSpline: CubicHermiteSplineInterpolation
+import FastGaussQuadrature: gausslegendre
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
@@ -52,6 +54,10 @@ export HankelSeries,
        scattered_coef
 
 export interpolate,
+       InterpPoint,
+       InterpLine,
+       Dtν_ν,
+       Dtν_νζ,
        ∂tν_∂ν
 
 export Rip2D, classify_outer_boundary, find_rips
@@ -74,7 +80,7 @@ include("pml_geometries/pml_geometries.jl")
 
 include("fields/fields.jl")
 
-include("interpolation.jl")
+include("interpolation/interpolation.jl")
 
 include("transformations/transformations.jl")
 
