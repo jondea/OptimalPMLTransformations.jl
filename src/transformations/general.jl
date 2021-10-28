@@ -153,6 +153,11 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     return tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field,ν), ν, field
 end
 
+function pole_newton_solve(u::AbstractFieldFunction, pml::PMLGeometry, args...; kwargs...)
+    u_pml_coords(tν,ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
+    return pole_newton_solve(u_pml_coords, args...;kwargs...)
+end
+
 function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Number; ε=1e-12)
 
     ν = ν0

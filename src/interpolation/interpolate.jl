@@ -1,9 +1,6 @@
 
 
-function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max)
-
-    δ = 1e-1
-    ε = 1e-4
+function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ = 1e-1, ε = 1e-4)
 
     function create_line(ζ)
         ν_vec = Float64[]
@@ -16,8 +13,8 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max)
 
     function possible_rip_between(line1::InterpLine, line2::InterpLine)::Bool
         knots = 0:0.01:ν_max
-        line1_points = line1.tν(knots)
-        line2_points = line2.tν(knots)
+        line1_points = line1.(knots)
+        line2_points = line2.(knots)
         rel_diff = (2*norm(line1_points - line2_points)
             /(norm(line1_points) + norm(line2_points)))
         return rel_diff > δ
@@ -28,7 +25,21 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max)
 
         # We have to stop at some point and accept there's a rip
         if abs(previous_line.ζ - next_line.ζ) < ε
-            push!(intrp, Rip(ζ_mid))
+            p_rip₋ = argmax(p->abs(p.∂tν_∂ν)*(1-p.ν), previous_line.points)
+            p_rip₊ = argmax(p->abs(p.∂tν_∂ν)*(1-p.ν), next_line.points)
+
+            ν_rip = (p_rip₋.ν + p_rip₊.ν)/2
+            tν_rip = (p_rip₋.tν + p_rip₊.tν)/2
+            ζ_rip = ζ_mid
+
+            ε_newton = 1e-12
+            ν_rip, ζ_rip, tν_rip = pole_newton_solve(u, pml, ν_rip, ζ_mid, tν_rip; ε=ε_newton)
+
+            # Add a line at the beginning and end of each continuous region
+            # How should we ensure we stay on the right branch?
+            # 1. We could use the analytic expression around the rip to perturb ourselves
+            # 2. We could numerically continue using the solution on either side
+            push!(intrp, Rip(ζ_rip))
             return
         end
 
@@ -72,8 +83,8 @@ function eval_hermite_patch(ν0::Number, ν1::Number, p0::Dtν_ν, p1::Dtν_ν, 
     h0, hd0, h1, hd1 = CubicHermiteSpline.basis(s)
     dh0, dhd0, dh1, dhd1 = CubicHermiteSpline.basis_derivative(s)
 
-    tν     = tν0*h0  + δ*dtν_dν0*hd0  + tν1*h1  + δ*dtν_dν1*hd1
-    dtν_ds = tν0*dh0 + δ*dtν_dν0*dhd0 + tν1*dh1 + δ*dtν_dν1*dhd1
+    tν     = tν0*h0  + δ*∂tν_∂ν0*hd0  + tν1*h1  + δ*∂tν_∂ν1*hd1
+    dtν_ds = tν0*dh0 + δ*∂tν_∂ν0*dhd0 + tν1*dh1 + δ*∂tν_∂ν1*dhd1
 
     return tν, dtν_ds/δ
 end
@@ -98,31 +109,37 @@ function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
 end
 
 function (line::InterpLine)(ν::Float64)
-    i = searchsortedfirst(line, ν; by=t->t[1])
-    if (i > length(line.tν) || i == 1)
+    i = searchsortedfirst(line.points, (;ν=ν); by=t->t.ν)
+    if i > length(line.points)
         throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
     end
-    p1 = line[i]
-    if (ν = p1.ν)
+    p1 = line.points[i]
+    if ν == p1.ν
         return p1.tν
     end
-    p0 = line.tν[i-1]
+    if i == 1
+        throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
+    end
+    p0 = line.points[i-1]
 
-    return eval_hermite_patch(p0, p1, ν)[1]
+    return eval_hermite_patch(p0, p1, ν).tν
 end
 
 function ∂tν_∂ν(line::InterpLine, ν::Float64)
-    i = searchsortedfirst(line.tν, ν; by=t->t[1])
-    if (i > length(line.tν) || i == 1)
+    i = searchsortedfirst(line.points, (;ν=ν); by=t->t.ν)
+    if i > length(line.points)
         throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
     end
-    p1 = line.tν[i]
-    if (ν = p1.ν)
+    p1 = line.points[i]
+    if ν == p1.ν
         return p1.tν
     end
-    p0 = line.tν[i-1]
+    if i == 1
+        throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
+    end
+    p0 = line.points[i-1]
 
-    return eval_hermite_patch(p0, p1, ν)[2]
+    return eval_hermite_patch(p0, p1, ν).∂tν_∂ν
 end
 
 
