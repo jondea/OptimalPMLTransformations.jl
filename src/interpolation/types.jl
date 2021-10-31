@@ -29,6 +29,27 @@ mutable struct Interpolation
     rips::Vector{Rip}
 end
 
+import Base.summary
+function summary(io::IO, intrp::Interpolation)
+    println(io, "Interpolation with $(length(intrp.rips)) rip$(length(intrp.rips) != 1 ? "s" : "")")
+    if !isempty(intrp.rips)
+        println(io, "Rips:")
+        for rip in intrp.rips
+            println(io, "    ζ = $(rip.ζ)")
+        end
+    end
+    if !isempty(intrp.continuous_region)
+        println(io, "Continuous regions of interpolation:")
+        for region in intrp.continuous_region
+            nlines = length(region.lines)
+            println(io, "    ζ from $(region.ζ₋) to $(region.ζ₊) with $(nlines) line$(nlines != 1 ? "s" : "")")
+        end
+    end
+end
+
+import Base.show
+show(io::IO, ::MIME"text/plain", i::Interpolation) = summary(io, i)
+
 function Interpolation(line::InterpLine)
     Interpolation([ContinuousInterpolation(line.ζ, line.ζ, [line])], [])
 end
