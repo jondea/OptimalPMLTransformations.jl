@@ -35,11 +35,22 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ
             ε_newton = 1e-12
             ν_rip, ζ_rip, tν_rip = pole_newton_solve(u, pml, ν_rip, ζ_mid, tν_rip; ε=ε_newton)
 
-            # Add a line at the beginning and end of each continuous region
-            # How should we ensure we stay on the right branch?
-            # 1. We could use the analytic expression around the rip to perturb ourselves
-            # 2. We could numerically continue using the solution on either side
+            # Continue from the previous line to exactly on the rip, this should capture the boundary on
+            # this side of the rip and will be the last line in the continuous region
+            rip_line₋ = continue_in_ζ(u, pml, ζ_rip, previous_line)
+
+            if possible_rip_between(previous_line, rip_line₋) error("ARGGGHH") end
+
+            push!(intrp, rip_line₋)
+
+            # Add new rip, implicitly creating new continuous region
             push!(intrp, Rip(ζ_rip))
+
+            # Continue from the next line to exactly on the rip, this should capture the boundary on
+            # the other side of the rip, which will be the first line of the next continuous region
+            rip_line₊ = continue_in_ζ(u, pml, ζ_rip, next_line)
+            push!(intrp, rip_line₊)
+
             return
         end
 
@@ -68,6 +79,8 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ
         push!(intrp, next_line)
         previous_line = next_line
     end
+
+    last(intrp.continuous_region).ζ₊ = last(ζs)
 
     return intrp
 end
