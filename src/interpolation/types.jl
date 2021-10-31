@@ -60,6 +60,7 @@ function push!(intrp::Interpolation, line::InterpLine)
 end
 
 function push!(intrp::Interpolation, rip::Rip)
+    last(intrp.continuous_region).ζ₊ = rip.ζ
     push!(intrp.rips, rip)
     push!(intrp.continuous_region, ContinuousInterpolation(rip.ζ, rip.ζ, []))
 end
