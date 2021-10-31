@@ -216,3 +216,31 @@ function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Numb
 
     return ν, ζ, tν
 end
+
+"Continue from p0 to ζ"
+function continue_in_ζ(field_fnc::Function, ζ::Number, p0::InterpPoint;
+    field=field_fnc(p0.tν, ζ), U_field=field_fnc(zero(p0.tν),ζ),
+    householder_order=3, N_iter_max=10, ε=1e-12)
+
+    ν = p0.ν
+    tν0 = p0.tν
+    U = U_field.u
+    tν, field, converged = corrector(tν->field_fnc(tν,ζ), U, ν, tν0, field; N_iter_max, householder_order, ε)
+    if !converged error("Did not converge") end
+    InterpPoint(ν, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field,ν))
+end
+
+function continue_in_ζ(u::AbstractFieldFunction, pml::PMLGeometry, args...; kwargs...)
+    u_pml_coords(tν,ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
+    return continue_in_ζ(u_pml_coords, args...; kwargs...)
+end
+
+"Continue from each point in tν0 to ζ"
+function continue_in_ζ(field_fnc::Function, ζ::Number, tν0::InterpLine; householder_order=3, N_iter_max=10, ε=1e-12)
+    U_field = field_fnc(zero(first(tν0.points).tν), ζ)
+
+    return InterpLine(
+        ζ,
+        [continue_in_ζ(field_fnc, ζ, p; U_field, N_iter_max, householder_order, ε) for p in tν0.points]
+    )
+end
