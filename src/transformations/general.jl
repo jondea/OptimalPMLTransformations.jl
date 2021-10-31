@@ -4,6 +4,45 @@ function optimal_pml_transformation_solve(u::AbstractFieldFunction, pml::PMLGeom
     return optimal_pml_transformation_solve(u_pml_coords, ν_max, args...;kwargs...)
 end
 
+function corrector(field_fnc::Function, U::Number, ν, tν0, field0=field_fnc(tν0); N_iter_max, householder_order=3, ε=1e-12)
+
+    f(field::NamedTuple)    = field.u - U*(1-ν)
+    df(field::NamedTuple)   = field.∂u_∂tν
+    ddf(field::NamedTuple)  = field.∂2u_∂tν2
+    dddf(field::NamedTuple) = field.∂3u_∂tν3
+
+    # Rescale f for error/objective
+    normalised_f(field::NamedTuple) = abs(f(field)/U)
+
+    field = field0
+    tν = tν0
+
+    # Corrector iterations
+    iter = 0
+    while normalised_f(field) > ε
+        dtν = -f(field)/df(field)
+
+        if householder_order == 1
+            tν = tν + dtν
+        elseif householder_order == 2
+            tν = tν + dtν*(1 + dtν*(ddf(field)/(2*df(field))))^(-1)
+        elseif householder_order == 3
+            tν = tν + dtν*(1 + dtν*(ddf(field)/(2*df(field)))) / (1 + (ddf(field)/df(field))*dtν + 1//6*(dddf(field)/df(field))*dtν^2)
+        else
+            error("Householder order $householder_order not implemented. Use 1, 2 or 3.")
+        end
+        # Calculate field and its derivatives at new point
+        field = field_fnc(tν)
+
+        # Keep track of number of iterations and exit to reduce stepsize if we do too many
+        iter += 1
+        if iter > N_iter_max
+            return tν, field, false
+        end
+    end
+
+    return tν, field, true
+end
 
 function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ν_vec::Union{Vector{T},Nothing}=nothing,
@@ -46,14 +85,6 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         ∂tν_∂ζ_vec[1] = ∂tν_∂ζ(field, U_field, ν)
     end
 
-    f(field::NamedTuple)::Complex{T}    = field.u - U*(1-ν)
-    df(field::NamedTuple)::Complex{T}   = field.∂u_∂tν
-    ddf(field::NamedTuple)::Complex{T}  = field.∂2u_∂tν2
-    dddf(field::NamedTuple)::Complex{T} = field.∂3u_∂tν3
-
-    # Rescale f for error/objective
-    normalised_f(field::NamedTuple) = abs(f(field)/U)
-
     # Tangent of tν
     t = ∂tν_∂ν(field_prev, U_field)
     t_prev = t
@@ -87,28 +118,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         field = field_fnc(tν)
 
         # Corrector iterations
-        iter = 0
-        while normalised_f(field) > ε
-            dtν = -f(field)/df(field)
-
-            if householder_order == 1
-                tν = tν + dtν
-            elseif householder_order == 2
-                tν = tν + dtν*(1 + dtν*(ddf(field)/(2*df(field))))^(-1)
-            elseif householder_order == 3
-                tν = tν + dtν*(1 + dtν*(ddf(field)/(2*df(field)))) / (1 + (ddf(field)/df(field))*dtν + 1//6*(dddf(field)/df(field))*dtν^2)
-            else
-                error("Householder order $householder_order not implemented. Use 1, 2 or 3.")
-            end
-            # Calculate field and its derivatives at new point
-            field = field_fnc(tν)
-
-            # Keep track of number of iterations and exit to reduce stepsize if we do too many
-            iter += 1
-            if iter > N_iter_max
-                break
-            end
-        end
+        tν, field, converged = corrector(field_fnc, U, ν, tν, field; N_iter_max, householder_order)
 
         # Get tangent at new point
         t = ∂tν_∂ν(field, U_field)
@@ -120,7 +130,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         # Only accept this stepsize if the tangent and value hasn't changed too much
         if (   t_angle_jump <= t_angle_jump_max
             && abs(tν-tν_prev) <= tν_jump_max
-            && normalised_f(field) <= ε )
+            && converged )
 
             # Add values to vectors if provided
             if !isnothing(ν_vec     ) push!(ν_vec, ν) end
