@@ -50,7 +50,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ∂tν_∂ν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
     ∂tν_∂ζ_vec::Union{Vector{Complex{T}},Nothing}=nothing;
     ν0=zero(T), tν0=zero(Complex{T}), field0=field_fnc(tν0), U_field=field_fnc(zero(Complex{T})), householder_order=3, ε=1.0e-12,
-    show_trace=false, h_max=0.1, tν_jump_max=0.5, t_angle_jump_max=π/8, N_iter_max=10, silent_failure=false) where {T<:Real}
+    show_trace=false, h_max=0.1, h_min=1e-12, tν_jump_max=0.5, t_angle_jump_max=π/8, N_iter_max=10, silent_failure=false) where {T<:Real}
 
     # Last resort kill switch
     overall_iter = 0
@@ -98,10 +98,12 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     # Keep going until we get to our target
     while ν < ν_max
 
-        # Last resort kill switch
+        # Last resort break to stop infinite loop
         overall_iter += 1
-        if overall_iter > 1000
+        if overall_iter > 10000
             if silent_failure
+                tν = T(NaN) + im*T(NaN)
+                field = field_fnc(tν)
                 break
             else
                 error("Too many steps overall, quitting")
@@ -110,6 +112,17 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
         # Step in ν
         ν = ν_prev + h
+
+        # Stepsize is too small, give up (unless this is the last step)
+        if h < h_min && ν != ν_max
+            if silent_failure
+                tν = T(NaN) + im*T(NaN)
+                field = field_fnc(tν)
+                break
+            else
+                error("Step size is smller than minimum, quitting")
+            end
+        end
 
         # Predictor step in tν using tangent (Euler)
         tν = tν_prev + h*t
