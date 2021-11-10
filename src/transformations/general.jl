@@ -15,7 +15,7 @@ function corrector(field_fnc::Function, U::Number, ν, tν0, field0=field_fnc(t�
     normalised_f(field::NamedTuple) = abs(f(field)/U)
 
     field = field0
-    tν = tν0
+    tν = complex(tν0)
 
     # Corrector iterations
     iter = 0
@@ -62,7 +62,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         ν_vec[1] = ν
     end
 
-    tν = tν0
+    tν = complex(tν0)
     if !isnothing(tν_vec)
         resize!(tν_vec, 1)
         tν_vec[1] = ν
