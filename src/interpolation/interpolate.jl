@@ -8,6 +8,7 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ
         ∂tν_∂ν_vec = ComplexF64[]
         ∂tν_∂ζ_vec = ComplexF64[]
         optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec)
+        # Add in point at ν=1? Try to work out if it's unbounded or not
         return InterpLine(ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec)
     end
 
@@ -205,4 +206,49 @@ function eval_hermite_patch(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, 
 				+ ∂tν_∂ζ01*h0ν*dhd1ζ  + ∂tν_∂ζ11*h1ν*dhd1ζ))
 
     return Dtν_νζ(tν, dtν_dsν/δν, dtν_dsζ/δζ)
+end
+
+function bilinear_patch(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, p00::Number, p10::Number, p01::Number, p11::Number, ν::Number, ζ::Number)
+    δν = ν1 - ν0
+    sν0 = (ν - ν0) / δν
+    sν1 = 1 - sν0
+    dsν0 = 1 / δν
+    dsν1 = -dsν1
+
+    δζ = ζ1 - ζ0
+    sζ0 = (ζ - ζ0) / δζ
+    sζ1 = 1 - sζ0
+    dsζ0 = 1 / δζ
+    dsζ1 = -dsζ0
+
+    tν     = p00*sν0*sζ0  + p10*sν1*sζ0  + p01*sν0*sζ1  + p11*sν1*sζ1
+    ∂tν_∂ν = p00*dsν0*sζ0 + p10*dsν1*sζ0 + p01*dsν0*sζ1 + p11*dsν1*sζ1
+    ∂tν_∂ζ = p00*sν0*dsζ0 + p10*sν1*dsζ0 + p01*sν0*dsζ1 + p11*sν1*dsζ1
+
+    return tν, ∂tν_∂ν, ∂tν_∂ζ
+end
+
+"Cubic interpolation in one direction, linear extrapolation in another"
+function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::Dtν_νζ, p01::Dtν_νζ, ν::Number, ζ::Number)
+    δν = ν1 - ν0
+    sν0 = (ν - ν0) / δν
+    hν = 1
+    hdν = sν0
+
+    δζ = ζ1 - ζ0
+    sζ = (ζ - ζ0) / δζ
+
+    h0ζ, hd0ζ, h1ζ, hd1ζ = CubicHermiteSpline.basis(sζ)
+    dh0ζ, dhd0ζ, dh1ζ, dhd1ζ = CubicHermiteSpline.basis_derivative(sζ)
+
+    tν = (p00.tν*hν*h0ζ +  p00.∂tν_∂ν*hdν*h0ζ + p00.∂tν_∂ζ*hν*hd0ζ
+        + p01.tν*hν*h1ζ +  p01.∂tν_∂ν*hdν*h1ζ + p01.∂tν_∂ζ*hν*hd1ζ)
+
+    ∂tν_∂ν = ( p00.∂tν_∂ν*h0ζ + p01.tν*h1ζ)
+
+    ∂tν_∂sζ = (p00.tν*hν*dh0ζ +  p00.∂tν_∂ν*hdν*dh0ζ + p00.∂tν_∂ζ*hν*dhd0ζ
+        + p01.tν*hν*dh1ζ +  p01.∂tν_∂ν*hdν*dh1ζ + p01.∂tν_∂ζ*hν*dhd1ζ)
+
+    return tν, ∂tν_∂ν, ∂tν_∂sζ/δζ
+
 end

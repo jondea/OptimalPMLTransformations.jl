@@ -81,3 +81,13 @@ end
 Dtν_νζ(p::InterpPoint) = Dtν_νζ(p.tν, p.∂tν_∂ν, p.∂tν_∂ζ)
 
 InterpPoint(ν::Float64, d::Dtν_νζ) = InterpPoint(ν, d.tν, d.∂tν_∂ν, d.∂tν_∂ζ)
+
+import Base.isnan
+isnan(p::InterpPoint) = isnan(p.ν) || isnan(p.tν) || isnan(p.∂tν_∂ν) || isnan(p.∂tν_∂ζ)
+isnan(p::Dtν_νζ) = isnan(p.tν) || isnan(p.∂tν_∂ν) || isnan(p.∂tν_∂ζ)
+isnan(p::Dtν_ν) = isnan(p.tν) || isnan(p.∂tν_∂ν)
+
+import Base.isinf
+isinf(p::InterpPoint) = isinf(p.ν) || isinf(p.tν) || isinf(p.∂tν_∂ν) || isinf(p.∂tν_∂ζ)
+isinf(p::Dtν_νζ) = isinf(p.tν) || isinf(p.∂tν_∂ν) || isinf(p.∂tν_∂ζ)
+isinf(p::Dtν_ν) = isinf(p.tν) || isinf(p.∂tν_∂ν)

@@ -81,8 +81,6 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
     done = false
 
     while !done
-
-
             if intrp_point0_next.ν > intrp_point1_next.ν
                 intrp11 = intrp_point1_next
                 ν1 = intrp11.ν
@@ -118,15 +116,40 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
         δν = ν1 - ν0
         δζ = ζ1 - ζ0
 
-        for (knot_ν, weight_ν) in zip(knots, weights)
-            for (knot_ζ, weight_ζ) in zip(knots, weights)
-                ν = ν0 + knot_ν*δν
-                ζ = ζ0 + knot_ζ*δζ
-                intrp = eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
-                integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
+        if isinf(intrp10) || isinf(intrp11)
+            # The transformation is unbounded at the outer edge so we have to extrapolate from the second to last point
+            for (knot_ν, weight_ν) in zip(knots, weights)
+                for (knot_ζ, weight_ζ) in zip(knots, weights)
+                    ν = ν0 + knot_ν*δν
+                    ζ = ζ0 + knot_ζ*δζ
+                    intrp = cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ)
+                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
+                end
+            end
+        elseif isnan(intrp00.∂tν_∂ν) || isnan(intrp00.∂tν_∂ζ) ||
+            isnan(intrp01.∂tν_∂ν) || isnan(intrp01.∂tν_∂ζ) ||
+            isnan(intrp10.∂tν_∂ν) || isnan(intrp10.∂tν_∂ζ) ||
+            isnan(intrp11.∂tν_∂ν) || isnan(intrp11.∂tν_∂ζ)
+            # A derivative is undefined, happens around the root of a rip (a branch point)
+
+            for (knot_ν, weight_ν) in zip(knots, weights)
+                for (knot_ζ, weight_ζ) in zip(knots, weights)
+                    ν = ν0 + knot_ν*δν
+                    ζ = ζ0 + knot_ζ*δζ
+                    intrp = bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)
+                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
+                end
+            end
+        else
+            for (knot_ν, weight_ν) in zip(knots, weights)
+                for (knot_ζ, weight_ζ) in zip(knots, weights)
+                    ν = ν0 + knot_ν*δν
+                    ζ = ζ0 + knot_ζ*δζ
+                    intrp = eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
+                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
+                end
             end
         end
-
         done = last_patch
         last_patch = isempty(intrp_points0) && isempty(intrp_points1)
 
