@@ -213,7 +213,7 @@ function bilinear_patch(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, p00:
     sν0 = (ν - ν0) / δν
     sν1 = 1 - sν0
     dsν0 = 1 / δν
-    dsν1 = -dsν1
+    dsν1 = -dsν0
 
     δζ = ζ1 - ζ0
     sζ0 = (ζ - ζ0) / δζ
@@ -249,6 +249,6 @@ function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::
     ∂tν_∂sζ = (p00.tν*hν*dh0ζ +  p00.∂tν_∂ν*hdν*dh0ζ + p00.∂tν_∂ζ*hν*dhd0ζ
         + p01.tν*hν*dh1ζ +  p01.∂tν_∂ν*hdν*dh1ζ + p01.∂tν_∂ζ*hν*dhd1ζ)
 
-    return tν, ∂tν_∂ν, ∂tν_∂sζ/δζ
+    return Dtν_νζ(tν, ∂tν_∂ν, ∂tν_∂sζ/δζ)
 
 end

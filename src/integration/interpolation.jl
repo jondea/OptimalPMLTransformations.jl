@@ -122,7 +122,7 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
                 for (knot_ζ, weight_ζ) in zip(knots, weights)
                     ν = ν0 + knot_ν*δν
                     ζ = ζ0 + knot_ζ*δζ
-                    intrp = cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ)
+                    intrp = InterpPoint(ν, cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ))
                     integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
                 end
             end
@@ -136,7 +136,7 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
                 for (knot_ζ, weight_ζ) in zip(knots, weights)
                     ν = ν0 + knot_ν*δν
                     ζ = ζ0 + knot_ζ*δζ
-                    intrp = bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)
+                    intrp = InterpPoint(ν, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
                     integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
                 end
             end
