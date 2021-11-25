@@ -161,3 +161,15 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
 
     integrand
 end
+
+function integrate(region::ContinuousInterpolation, f::Function; order=2)
+    lines = Base.Iterators.Stateful(region.lines)
+    line_prev = popfirst!(lines)
+    integrand = 0
+    while !isempty(lines)
+        line_next = peek(lines)
+        integrand += integrate_between(line_prev, line_next, f; order)
+        line_prev = popfirst!(lines)
+    end
+    integrand
+end

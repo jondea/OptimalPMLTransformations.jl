@@ -73,6 +73,9 @@ export gausslegendreunit,
        gausslegendretrans_mid,
        int_gauss_trans_2d_mid
 
+export integrate
+export integrate_between
+
 export optimal_pml_transformation_solve
 
 include("utils.jl")
