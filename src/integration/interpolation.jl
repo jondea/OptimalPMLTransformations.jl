@@ -1,19 +1,23 @@
 
-
-function integrate(tν_interp::InterpLine, f::Function; order=2)
+function integrate(intrp::InterpLine, f::Function; order=2)
     knots, weights = gausslegendre(order)
+    knots .= (knots .+ 1)./2
+    weights ./= 2
     # Note to self, write iterator over spline patches
     # so that this algorithm is O(N) rather than O(N^2)
-    intrp_ν = Base.Iterators.Stateful(tν_interp.x)
-    intrp_ν_prev = popfirst!(intrp_ν)
-    integrand = zero(f(intrp, intrp_ν_prev))
-    for intrp_ν_next in intrp_ν
-        h = intrp_ν_next - intrp_ν_prev
+    intrp_it = Base.Iterators.Stateful(intrp.points)
+    intrp_prev = popfirst!(intrp_it)
+    integrand = zero(f(intrp_prev))
+    while !isempty(intrp_it)
+        intrp_next = peek(intrp_it)
+        h = intrp_next.ν - intrp_prev.ν
         for (knot, weight) in zip(knots, weights)
-            ν = intrp_ν_prev + knot * h/2
-            integrand += f(tν_intrp(ν))*weight*h
+            ν = intrp_prev.ν + knot * h
+            # TODO: Implement eval_hermite_patch which takes knot directly
+            intrp_point = eval_hermite_patch(intrp_prev, intrp_next, ν)
+            integrand += f(intrp_point)*weight*h
         end
-        intrp_ν_prev = intrp_ν_next
+        intrp_prev = popfirst!(intrp_it)
     end
     integrand
 end
