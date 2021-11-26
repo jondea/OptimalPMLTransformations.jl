@@ -85,34 +85,33 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
     done = false
 
     while !done
-            if intrp_point0_next.ν > intrp_point1_next.ν
-                intrp11 = intrp_point1_next
-                ν1 = intrp11.ν
-                # We don't have a point for 0, interpolate tν
-                intrp10 = eval_hermite_patch(intrp_point0_next, intrp_point0_prev, ν1)
+        if intrp_point0_next.ν > intrp_point1_next.ν
+            intrp11 = intrp_point1_next
+            ν1 = intrp11.ν
+            # We don't have a point for 0, interpolate tν
+            intrp10 = eval_hermite_patch(intrp_point0_next, intrp_point0_prev, ν1)
 
-                intrp_point1_prev = intrp_point1_next
-                intrp_point1_next = popfirst!(intrp_points1)
+            intrp_point1_prev = intrp_point1_next
+            intrp_point1_next = popfirst!(intrp_points1)
 
-            elseif intrp_point1_next.ν > intrp_point0_next.ν
-                intrp10 = intrp_point0_next
-                ν1 = intrp10.ν
-                # We don't have a point for 1, interpolate
-                intrp11 = eval_hermite_patch(intrp_point1_next, intrp_point1_prev, ν1)
+        elseif intrp_point1_next.ν > intrp_point0_next.ν
+            intrp10 = intrp_point0_next
+            ν1 = intrp10.ν
+            # We don't have a point for 1, interpolate
+            intrp11 = eval_hermite_patch(intrp_point1_next, intrp_point1_prev, ν1)
 
-                intrp_point0_prev = intrp_point0_next
+            intrp_point0_prev = intrp_point0_next
+            intrp_point0_next = popfirst!(intrp_points0)
+        else # Equal
+            intrp10 = intrp_point0_next
+            intrp11 = intrp_point1_next
+
+            ν1 = intrp11.ν # == intrp10.ν
+
+            # The end points must be equal on the last patch
+            if !last_patch
                 intrp_point0_next = popfirst!(intrp_points0)
-            else # Equal
-                intrp10 = intrp_point0_next
-                intrp11 = intrp_point1_next
-
-                ν1 = intrp11.ν # == intrp10.ν
-
-                # The end points must be equal on the last patch
-                if !last_patch
-                    intrp_point0_next = popfirst!(intrp_points0)
-                    intrp_point1_next = popfirst!(intrp_points1)
-                else
+                intrp_point1_next = popfirst!(intrp_points1)
             end
         end
 
