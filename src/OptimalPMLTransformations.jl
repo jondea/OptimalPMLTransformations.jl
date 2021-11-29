@@ -58,7 +58,8 @@ export interpolate,
        InterpLine,
        Dtν_ν,
        Dtν_νζ,
-       ∂tν_∂ν
+       ∂tν_∂ν,
+       refine!
 
 export Rip2D, classify_outer_boundary, find_rips
 
