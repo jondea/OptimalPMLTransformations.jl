@@ -59,7 +59,8 @@ export interpolate,
        Dtν_ν,
        Dtν_νζ,
        ∂tν_∂ν,
-       refine!
+       refine!,
+       refine_in_ζ!
 
 export Rip2D, classify_outer_boundary, find_rips
 
