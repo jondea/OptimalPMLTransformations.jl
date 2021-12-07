@@ -45,118 +45,61 @@ end
 
 function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::Function; order=2)
 
-    intrp_points0 = Base.Iterators.Stateful(tν_interp0.points)
-    intrp_points1 = Base.Iterators.Stateful(tν_interp1.points)
-
-    intrp_point0_prev = popfirst!(intrp_points0)
-    intrp_point1_prev = popfirst!(intrp_points1)
-
-    intrp00 = intrp_point0_prev
-    intrp01 = intrp_point1_prev
-
-    ν0 = min(intrp_point0_prev.ν, intrp_point1_prev.ν)
+    # We could probably deal with this by extrapolation, but we shouldn't have to
+    @assert first(tν_interp0.points).ν == first(tν_interp1.points).ν
+    @assert last(tν_interp0.points).ν == last(tν_interp1.points).ν
 
     ζ0 = tν_interp0.ζ
     ζ1 = tν_interp1.ζ
 
-    # We could probably deal with this by extrapolation, but we shouldn't have
-    @assert first(tν_interp0.points).ν == first(tν_interp1.points).ν
-    @assert last(tν_interp0.points).ν == last(tν_interp1.points).ν
+    intrp_points0 = Base.Iterators.Stateful(tν_interp0.points)
+    intrp_points1 = Base.Iterators.Stateful(tν_interp1.points)
 
-    intrp_point0_next = popfirst!(intrp_points0)
-    intrp_point1_next = popfirst!(intrp_points1)
-
-    intrp10 = intrp_point0_next
-    intrp11 = intrp_point1_next
-    ν1 = min(intrp01.ν, intrp11.ν)
-
+    # Get knots and weights and normalise for [0,1]
     knots, weights = gausslegendre(order)
     knots .= (knots .+ 1)./2
     weights ./= 2
 
-    function linear_interpolate_∂tν_∂ζ(p0::InterpPoint, p1::InterpPoint, ν::Number)
-        t = (ν - p0.ν)/(p1.ν - p0.ν)
-        (1-t)*p0.∂tν_∂ζ + t*p1.∂tν_∂ζ
-    end
+    intrp00 = popfirst!(intrp_points0)
+    intrp01 = popfirst!(intrp_points1)
 
+    ν0 = min(intrp01.ν, intrp00.ν)
+    ν1 = ν0
     integrand = zero(f(intrp00))
 
-    last_patch = isempty(intrp_points0) && isempty(intrp_points1)
-    done = false
+    while !isempty(intrp_points0) && !isempty(intrp_points1)
 
-    while !done
-        if intrp_point0_next.ν > intrp_point1_next.ν
-            intrp11 = intrp_point1_next
-            ν1 = intrp11.ν
-            # We don't have a point for 0, interpolate tν
-            intrp10 = eval_hermite_patch(intrp_point0_next, intrp_point0_prev, ν1)
-
-            intrp_point1_prev = intrp_point1_next
-            intrp_point1_next = popfirst!(intrp_points1)
-
-        elseif intrp_point1_next.ν > intrp_point0_next.ν
-            intrp10 = intrp_point0_next
-            ν1 = intrp10.ν
-            # We don't have a point for 1, interpolate
-            intrp11 = eval_hermite_patch(intrp_point1_next, intrp_point1_prev, ν1)
-
-            intrp_point0_prev = intrp_point0_next
-            intrp_point0_next = popfirst!(intrp_points0)
-        else # Equal
-            intrp10 = intrp_point0_next
-            intrp11 = intrp_point1_next
-
-            ν1 = intrp11.ν # == intrp10.ν
-
-            # The end points must be equal on the last patch
-            if !last_patch
-                intrp_point0_next = popfirst!(intrp_points0)
-                intrp_point1_next = popfirst!(intrp_points1)
-            end
+        # If one is smaller than the other, use the point with the smallest ν,
+        # popping it to show it has been used. Interpolate by peeking forward for the other
+        if peek(intrp_points0).ν > peek(intrp_points1).ν
+            intrp11 = popfirst!(intrp_points1)
+            intrp10 = eval_hermite_patch(intrp00, peek(intrp_points0), intrp11.ν)
+        elseif peek(intrp_points1).ν > peek(intrp_points0).ν
+            intrp10 = popfirst!(intrp_points0)
+            intrp11 = eval_hermite_patch(intrp01, peek(intrp_points1), intrp10.ν)
+        else # Equal, use both
+            intrp10 = popfirst!(intrp_points0)
+            intrp11 = popfirst!(intrp_points1)
         end
 
-        # Integrate over patch using hermite with intrp00 etc
+        if isnan(intrp10.tν) || isnan(intrp11.tν) error("Oh noes") end
+
+        ν1 = intrp11.ν # == intrp10.ν
+
+        # Integrate over patch using hermite with intrp points
         δν = ν1 - ν0
         δζ = ζ1 - ζ0
-
-        if isinf(intrp10) || isinf(intrp11)
-            # The transformation is unbounded at the outer edge so we have to extrapolate from the second to last point
-            for (knot_ν, weight_ν) in zip(knots, weights)
-                for (knot_ζ, weight_ζ) in zip(knots, weights)
-                    ν = ν0 + knot_ν*δν
-                    ζ = ζ0 + knot_ζ*δζ
-                    intrp = InterpPoint(ν, cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ))
-                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
-                end
-            end
-        elseif isnan(intrp00.∂tν_∂ν) || isnan(intrp00.∂tν_∂ζ) ||
-            isnan(intrp01.∂tν_∂ν) || isnan(intrp01.∂tν_∂ζ) ||
-            isnan(intrp10.∂tν_∂ν) || isnan(intrp10.∂tν_∂ζ) ||
-            isnan(intrp11.∂tν_∂ν) || isnan(intrp11.∂tν_∂ζ)
-            # A derivative is undefined, happens around the root of a rip (a branch point)
-
-            for (knot_ν, weight_ν) in zip(knots, weights)
-                for (knot_ζ, weight_ζ) in zip(knots, weights)
-                    ν = ν0 + knot_ν*δν
-                    ζ = ζ0 + knot_ζ*δζ
-                    intrp = InterpPoint(ν, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
-                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
-                end
-            end
-        else
-            for (knot_ν, weight_ν) in zip(knots, weights)
-                for (knot_ζ, weight_ζ) in zip(knots, weights)
-                    ν = ν0 + knot_ν*δν
-                    ζ = ζ0 + knot_ζ*δζ
-                    intrp = eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
-                    integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
-                end
+        for (knot_ν, weight_ν) in zip(knots, weights)
+            for (knot_ζ, weight_ζ) in zip(knots, weights)
+                ν = ν0 + knot_ν*δν
+                ζ = ζ0 + knot_ζ*δζ
+                intrp = evaluate(InterpPatch(intrp00,intrp01, intrp10, intrp11), ζ0, ζ1, ν, ζ)
+                integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
+                if isnan(integrand) error("ARGGHH") end
             end
         end
-        done = last_patch
-        last_patch = isempty(intrp_points0) && isempty(intrp_points1)
 
-        # Prepare for next iteration
+        # End points from this patch become start points for next patch
         ν0 = ν1
         intrp00 = intrp10
         intrp01 = intrp11

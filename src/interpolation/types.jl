@@ -14,6 +14,13 @@ struct InterpLine
     points::Vector{InterpPoint}
 end
 
+struct InterpPatch
+    p00::InterpPoint
+    p01::InterpPoint
+    p10::InterpPoint
+    p11::InterpPoint
+end
+
 function InterpLine(ζ::Float64, ν_vec::Vector{Float64}, tν_vec::Vector{ComplexF64}, ∂tν_∂ν_vec::Vector{ComplexF64}, ∂tν_∂ζ_vec::Vector{ComplexF64})
     InterpLine(ζ, [InterpPoint(t...) for t in zip(ν_vec,tν_vec,∂tν_∂ν_vec,∂tν_∂ζ_vec)])
 end

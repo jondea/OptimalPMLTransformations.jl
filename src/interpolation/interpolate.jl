@@ -119,11 +119,16 @@ function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
 
     δ = ν1 - ν0
     s = (ν - ν0) / δ
+    if !isnan(∂tν_∂ν0) && !isnan(∂tν_∂ν1)
     h0, hd0, h1, hd1 = CubicHermiteSpline.basis(s)
     dh0, dhd0, dh1, dhd1 = CubicHermiteSpline.basis_derivative(s)
 
     tν     = tν0*h0  + δ*∂tν_∂ν0*hd0  + tν1*h1  + δ*∂tν_∂ν1*hd1
     dtν_ds = tν0*dh0 + δ*∂tν_∂ν0*dhd0 + tν1*dh1 + δ*∂tν_∂ν1*dhd1
+    else
+        tν     = tν0*(1-s)  + tν1*s
+        dtν_ds = δ*∂tν_∂ν0*(1-s) + δ*∂tν_∂ν1*s
+    end
 
     # Linear interpolation is best we can do with ζ
     ∂tν_∂ζ = (1-s)*∂tν_∂ζ0 + s*∂tν_∂ζ1
@@ -251,4 +256,27 @@ function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::
 
     return Dtν_νζ(tν, ∂tν_∂ν, ∂tν_∂sζ/δζ)
 
+end
+
+function evaluate(patch::InterpPatch, ζ0, ζ1, ν, ζ)::InterpPoint
+    intrp00 = patch.p00
+    intrp01 = patch.p01
+    intrp10 = patch.p10
+    intrp11 = patch.p11
+
+    ν0 = intrp00.ν
+    ν1 = intrp10.ν
+
+    if isinf(intrp10) || isinf(intrp11)
+        # The transformation is unbounded at the outer edge so we have to extrapolate from the second to last point
+        return InterpPoint(ν, cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ))
+    elseif isnan(intrp00.∂tν_∂ν) || isnan(intrp00.∂tν_∂ζ) ||
+           isnan(intrp01.∂tν_∂ν) || isnan(intrp01.∂tν_∂ζ) ||
+           isnan(intrp10.∂tν_∂ν) || isnan(intrp10.∂tν_∂ζ) ||
+           isnan(intrp11.∂tν_∂ν) || isnan(intrp11.∂tν_∂ζ)
+        # A derivative is undefined, happens around the root of a rip (a branch point)
+        return InterpPoint(ν, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
+    else
+        return eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
+    end
 end
