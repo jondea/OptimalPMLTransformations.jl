@@ -82,8 +82,6 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
             intrp11 = popfirst!(intrp_points1)
         end
 
-        if isnan(intrp10.tν) || isnan(intrp11.tν) error("Oh noes") end
-
         ν1 = intrp11.ν # == intrp10.ν
 
         # Integrate over patch using hermite with intrp points
@@ -95,7 +93,6 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
                 ζ = ζ0 + knot_ζ*δζ
                 intrp = evaluate(InterpPatch(intrp00,intrp01, intrp10, intrp11), ζ0, ζ1, ν, ζ)
                 integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
-                if isnan(integrand) error("ARGGHH") end
             end
         end
 
