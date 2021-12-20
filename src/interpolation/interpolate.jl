@@ -120,11 +120,11 @@ function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
     δ = ν1 - ν0
     s = (ν - ν0) / δ
     if !isnan(∂tν_∂ν0) && !isnan(∂tν_∂ν1)
-    h0, hd0, h1, hd1 = CubicHermiteSpline.basis(s)
-    dh0, dhd0, dh1, dhd1 = CubicHermiteSpline.basis_derivative(s)
+        h0, hd0, h1, hd1 = CubicHermiteSpline.basis(s)
+        dh0, dhd0, dh1, dhd1 = CubicHermiteSpline.basis_derivative(s)
 
-    tν     = tν0*h0  + δ*∂tν_∂ν0*hd0  + tν1*h1  + δ*∂tν_∂ν1*hd1
-    dtν_ds = tν0*dh0 + δ*∂tν_∂ν0*dhd0 + tν1*dh1 + δ*∂tν_∂ν1*dhd1
+        tν     = tν0*h0  + δ*∂tν_∂ν0*hd0  + tν1*h1  + δ*∂tν_∂ν1*hd1
+        dtν_ds = tν0*dh0 + δ*∂tν_∂ν0*dhd0 + tν1*dh1 + δ*∂tν_∂ν1*dhd1
     else
         tν     = tν0*(1-s)  + tν1*s
         dtν_ds = δ*∂tν_∂ν0*(1-s) + δ*∂tν_∂ν1*s
@@ -278,5 +278,17 @@ function evaluate(patch::InterpPatch, ζ0, ζ1, ν, ζ)::InterpPoint
         return InterpPoint(ν, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
     else
         return eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
+    end
+end
+
+function evalute_and_correct(u, pml, patch::InterpPatch, ζ0, ζ1, ν, ζ)
+    intrp = evaluate(patch, ζ0, ζ1, ν, ζ)
+    field_fnc(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν, ζ), pml)
+    U_field = field_fnc(zero(complex(ν)))
+    tν, field, converged = corrector(field_fnc, U_field.u, ν, intrp.tν, U_field)
+    if converged
+        return InterpPoint(ν, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field, ν))
+    else
+        return InterpPoint(ν, NaN+im*NaN, NaN+im*NaN, NaN+im*NaN)
     end
 end

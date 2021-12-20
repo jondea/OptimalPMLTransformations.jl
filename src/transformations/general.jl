@@ -4,7 +4,7 @@ function optimal_pml_transformation_solve(u::AbstractFieldFunction, pml::PMLGeom
     return optimal_pml_transformation_solve(u_pml_coords, ν_max, args...;kwargs...)
 end
 
-function corrector(field_fnc::Function, U::Number, ν, tν0, field0=field_fnc(tν0); N_iter_max, householder_order=3, ε=1e-12)
+function corrector(field_fnc::Function, U::Number, ν, tν0, field0=field_fnc(tν0); N_iter_max=10, householder_order=3, ε=1e-12)
 
     f(field::NamedTuple)    = field.u - U*(1-ν)
     df(field::NamedTuple)   = field.∂u_∂tν

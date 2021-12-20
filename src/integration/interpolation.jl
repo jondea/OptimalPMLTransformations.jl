@@ -116,3 +116,74 @@ function integrate(region::ContinuousInterpolation, f::Function; order=2)
     end
     integrand
 end
+
+function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::InterpLine, f::Function; order=2)
+
+    # We could probably deal with this by extrapolation, but we shouldn't have to
+    @assert first(tν_interp0.points).ν == first(tν_interp1.points).ν
+    @assert last(tν_interp0.points).ν == last(tν_interp1.points).ν
+
+    ζ0 = tν_interp0.ζ
+    ζ1 = tν_interp1.ζ
+
+    intrp_points0 = Base.Iterators.Stateful(tν_interp0.points)
+    intrp_points1 = Base.Iterators.Stateful(tν_interp1.points)
+
+    intrp00 = popfirst!(intrp_points0)
+    intrp01 = popfirst!(intrp_points1)
+
+    ν0 = min(intrp01.ν, intrp00.ν)
+    ν1 = ν0
+    integrand = zero(f(InterpPatch(intrp00,intrp01,intrp00,intrp01), ζ0, ζ1, ν0, ζ0))
+
+    while !isempty(intrp_points0) && !isempty(intrp_points1)
+
+        # If one is smaller than the other, use the point with the smallest ν,
+        # popping it to show it has been used. Interpolate by peeking forward for the other
+        if peek(intrp_points0).ν > peek(intrp_points1).ν
+            intrp11 = popfirst!(intrp_points1)
+            intrp10 = eval_hermite_patch(intrp00, peek(intrp_points0), intrp11.ν)
+        elseif peek(intrp_points1).ν > peek(intrp_points0).ν
+            intrp10 = popfirst!(intrp_points0)
+            intrp11 = eval_hermite_patch(intrp01, peek(intrp_points1), intrp10.ν)
+        else # Equal, use both
+            intrp10 = popfirst!(intrp_points0)
+            intrp11 = popfirst!(intrp_points1)
+        end
+
+        if isnan(intrp10.tν) || isnan(intrp11.tν) error("Oh noes") end
+
+        ν1 = intrp11.ν # == intrp10.ν
+
+        patch = InterpPatch(intrp00, intrp01, intrp10, intrp11)
+        function integrand_fnc(νζ)
+            ret = f(patch, ζ0, ζ1, νζ[1], νζ[2])
+            # @show νζ ret
+            ret
+        end
+        I, E = hcubature(integrand_fnc, SA[ν0, ζ0], SA[ν1, ζ1])
+        integrand += I
+        @show ζ0, ζ1, ν0, ν1, I, E
+        ν1 = intrp11.ν # == intrp10.ν
+
+        # End points from this patch become start points for next patch
+        ν0 = ν1
+        intrp00 = intrp10
+        intrp01 = intrp11
+    end
+
+    integrand
+end
+
+
+function integrate_hcubature(region::ContinuousInterpolation, f::Function; order=2)
+    lines = Base.Iterators.Stateful(region.lines)
+    line_prev = popfirst!(lines)
+    integrand = 0
+    while !isempty(lines)
+        line_next = peek(lines)
+        integrand += integrate_between_hcubature(line_prev, line_next, f; order)
+        line_prev = popfirst!(lines)
+    end
+    integrand
+end

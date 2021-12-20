@@ -1,7 +1,7 @@
 module OptimalPMLTransformations
 
 import SpecialFunctions: hankelh1, besselj
-import StaticArrays: SVector, SMatrix, @SMatrix, SDiagonal
+import StaticArrays: SVector, SMatrix, @SMatrix, SDiagonal, SA
 import ProgressMeter: @showprogress
 import OffsetArrays: OffsetVector
 import LinearAlgebra: I, norm
@@ -10,6 +10,7 @@ import InverseHankelFunction: invhankelh1n, diffinvhankelh1n, diffhankelh1
 import CubicHermiteSpline
 import CubicHermiteSpline: CubicHermiteSplineInterpolation
 import FastGaussQuadrature: gausslegendre
+import HCubature: hcubature
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
@@ -76,6 +77,7 @@ export gausslegendreunit,
        int_gauss_trans_2d_mid
 
 export integrate
+export integrate_hcubature
 export integrate_between
 
 export optimal_pml_transformation_solve
