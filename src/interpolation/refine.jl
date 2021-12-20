@@ -20,7 +20,7 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
         tν_vec = ComplexF64[]
         ∂tν_∂ν_vec = ComplexF64[]
         ∂tν_∂ζ_vec = ComplexF64[]
-        _, _, _, _, field = optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec;ν0=ν, tν0=tν, field0=field, U_field)
+        _, _, _, _, field = optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec;ν0=ν, tν0=tν, field0=field, U_field, silent_failure=true)
 
         append!(extra_points, [InterpPoint(t...) for t in zip(ν_vec,tν_vec,∂tν_∂ν_vec,∂tν_∂ζ_vec)][2:end])
         prev_point = popfirst!(points)
@@ -32,7 +32,8 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
 end
 
 function refine_in_ζ!(region::ContinuousInterpolation, u::AbstractFieldFunction, pml::PMLGeometry)
-    ν_max = 1.0
+    ν_max = last(first(region.lines).points).ν
+
     function create_line(ζ)
         ν_vec = Float64[]
         tν_vec = ComplexF64[]
