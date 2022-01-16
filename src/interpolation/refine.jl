@@ -7,22 +7,19 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
     points = Base.Iterators.Stateful(line.points)
     prev_point = popfirst!(points)
 
-    U_field = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(0.0+0.0im,ζ), pml)
-    field = U_field
+    field_fnc(ν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(ν,ζ), pml)
+
+    U_field = field_fnc(0.0 + 0.0im)
+    U = U_field.u
     while !isempty(points)
         next_point = peek(points)
 
-        ν = prev_point.ν
-        tν = prev_point.tν
-        ν_max = (prev_point.ν + next_point.ν)/2
+        ν = (prev_point.ν + next_point.ν)/2
+        tν0 = eval_hermite_patch(prev_point, next_point, ν).tν
 
-        ν_vec = Float64[]
-        tν_vec = ComplexF64[]
-        ∂tν_∂ν_vec = ComplexF64[]
-        ∂tν_∂ζ_vec = ComplexF64[]
-        _, _, _, _, field = optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec;ν0=ν, tν0=tν, field0=field, U_field, silent_failure=true)
-
-        append!(extra_points, [InterpPoint(t...) for t in zip(ν_vec,tν_vec,∂tν_∂ν_vec,∂tν_∂ζ_vec)][2:end])
+        tν, field, converged = corrector(field_fnc, U, ν, tν0; N_iter_max=10, householder_order=3)
+        if !converged error() end
+        push!(extra_points, InterpPoint(ν, tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field, ν)))
         prev_point = popfirst!(points)
     end
 
