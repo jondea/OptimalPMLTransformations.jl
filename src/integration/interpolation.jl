@@ -117,7 +117,7 @@ function integrate(region::ContinuousInterpolation, f::Function; order=2)
     integrand
 end
 
-function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::InterpLine, f::Function; order=2)
+function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::InterpLine, f::Function; kwargs...)
 
     # We could probably deal with this by extrapolation, but we shouldn't have to
     @assert first(tν_interp0.points).ν == first(tν_interp1.points).ν
@@ -161,7 +161,7 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
             # @show νζ ret
             ret
         end
-        I, E = hcubature(integrand_fnc, SA[ν0, ζ0], SA[ν1, ζ1])
+        I, E = hcubature(integrand_fnc, SA[ν0, ζ0], SA[ν1, ζ1]; kwargs...)
         integrand += I
         @show ζ0, ζ1, ν0, ν1, I, E
         ν1 = intrp11.ν # == intrp10.ν
@@ -176,13 +176,13 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
 end
 
 
-function integrate_hcubature(region::ContinuousInterpolation, f::Function; order=2)
+function integrate_hcubature(region::ContinuousInterpolation, f::Function; kwargs...)
     lines = Base.Iterators.Stateful(region.lines)
     line_prev = popfirst!(lines)
     integrand = 0
     while !isempty(lines)
         line_next = peek(lines)
-        integrand += integrate_between_hcubature(line_prev, line_next, f; order)
+        integrand += integrate_between_hcubature(line_prev, line_next, f; kwargs...)
         line_prev = popfirst!(lines)
     end
     integrand
