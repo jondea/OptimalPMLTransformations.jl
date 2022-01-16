@@ -136,38 +136,29 @@ function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
     return InterpPoint(ν, tν, dtν_ds/δ, ∂tν_∂ζ)
 end
 
-function (line::InterpLine)(ν::Float64)
+function InterpPoint(line::InterpLine, ν::Float64)::InterpPoint
     i = searchsortedfirst(line.points, (;ν=ν); by=t->t.ν)
     if i > length(line.points)
         throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
     end
     p1 = line.points[i]
     if ν == p1.ν
-        return p1.tν
+        return p1
     end
     if i == 1
         throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
     end
     p0 = line.points[i-1]
 
-    return eval_hermite_patch(p0, p1, ν).tν
+    return eval_hermite_patch(p0, p1, ν)
+end
+
+function (line::InterpLine)(ν::Float64)
+    return InterpPoint(line, ν).tν
 end
 
 function ∂tν_∂ν(line::InterpLine, ν::Float64)
-    i = searchsortedfirst(line.points, (;ν=ν); by=t->t.ν)
-    if i > length(line.points)
-        throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
-    end
-    p1 = line.points[i]
-    if ν == p1.ν
-        return p1.tν
-    end
-    if i == 1
-        throw(DomainError(ν, "is outside of sampled range, hence we cannot interpolate"))
-    end
-    p0 = line.points[i-1]
-
-    return eval_hermite_patch(p0, p1, ν).∂tν_∂ν
+    return InterpPoint(line, ν).∂tν_∂ν
 end
 
 
