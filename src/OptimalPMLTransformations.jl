@@ -57,11 +57,16 @@ export HankelSeries,
 export interpolate,
        InterpPoint,
        InterpLine,
+       ContinuousInterpolation,
+       Interpolation,
+       InterpPatch,
        Dtν_ν,
        Dtν_νζ,
        ∂tν_∂ν,
        refine!,
-       refine_in_ζ!
+       refine_in_ζ!,
+       evaluate,
+       evalute_and_correct
 
 export Rip2D, classify_outer_boundary, find_rips
 
@@ -79,6 +84,7 @@ export gausslegendreunit,
 export integrate
 export integrate_hcubature
 export integrate_between
+export integrate_quad
 
 export optimal_pml_transformation_solve
 
