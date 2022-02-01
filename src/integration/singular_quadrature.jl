@@ -140,3 +140,51 @@ function int_gauss_trans_2d_mid(f::Function, N::Int; a=0.5, x_crit=(0.7,0.2))
     end
     return int_f
 end
+
+function integrate_quad(u::AbstractFieldFunction, pml::PMLGeometry, ν_range, ζ_range, integration_order)
+    field_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)},
+        PMLCoordinates(tν,ζ), pml)
+
+    rips = find_rips(field_fnc_νζ, ζ_range[1], ζ_range[2], Nζ=21, ν=0.999, ε=1e-3)
+
+    ν_crit = only(rips).ν
+    ζ_crit = only(rips).ζ
+
+    ζ_width = ζ_range[2]-ζ_range[1]
+
+    # Find singularity
+    s_crit = ((ζ_crit - ζ_range[1])/ζ_width, ν_crit)
+
+    # Get Gauss-Legendre knot points and weights, and transform to [0,1]
+    nodes, weights = gausslegendre(integration_order)
+    nodes .= (nodes .+ 1)/2
+    weights .= weights./2
+
+    integral = 0.0 + 0.0im
+
+    n_knot = 1
+    for _ in 1:2integration_order # Loop around ζ
+        # Initialise stepping through and integrating
+        trans_node, _ = gausslegendretrans_mid(n_knot, nodes, weights, s_crit)
+        ζ = ζ_range[1] + trans_node[1] * ζ_width
+        ν = 0.0
+        ν_prev = ν
+        tν = 0.0 + 0.0im
+        tν_prev = tν
+        field_fnc_ν(tν) = field_fnc_νζ(tν, ζ)
+        U_field = field_fnc_ν(0.0+0.0im)
+        field = U_field
+        for _ in 1:2integration_order # Loop around ν
+            trans_node, trans_weight = gausslegendretrans_mid(n_knot, nodes, weights, s_crit)
+            ν = trans_node[2]
+            tν, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field = optimal_pml_transformation_solve(field_fnc_ν, ν;
+             ν0=ν_prev, tν0=tν_prev, field0=field, U_field=U_field, householder_order=3)
+            integral += trans_weight*integrand(ν, ∂tν_∂ν)*ζ_width
+
+            n_knot += 1
+            ν_prev = ν
+            tν_prev = tν
+        end
+    end
+    return integral
+end

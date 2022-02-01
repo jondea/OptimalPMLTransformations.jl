@@ -94,8 +94,8 @@ include("interpolation/interpolation.jl")
 
 include("transformations/transformations.jl")
 
-include("integration/integration.jl")
-
 include("rips/rips.jl")
+
+include("integration/integration.jl")
 
 end # module
