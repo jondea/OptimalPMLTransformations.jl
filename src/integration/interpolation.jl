@@ -175,6 +175,9 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
     integrand
 end
 
+function integrate_hcubature(intrp::Interpolation, f::Function; kwargs...)
+    mapreduce(region->integrate_hcubature(region, f; kwargs...), +, intrp.continuous_region)
+end
 
 function integrate_hcubature(region::ContinuousInterpolation, f::Function; kwargs...)
     lines = Base.Iterators.Stateful(region.lines)
