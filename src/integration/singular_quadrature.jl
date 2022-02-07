@@ -141,7 +141,7 @@ function int_gauss_trans_2d_mid(f::Function, N::Int; a=0.5, x_crit=(0.7,0.2))
     return int_f
 end
 
-function integrate_quad(u::AbstractFieldFunction, pml::PMLGeometry, ν_range, ζ_range, integration_order)
+function integrate_quad(u::AbstractFieldFunction, pml::PMLGeometry, integrand::Function, ζ_range, integration_order)
     field_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)},
         PMLCoordinates(tν,ζ), pml)
 
