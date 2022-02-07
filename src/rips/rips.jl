@@ -61,7 +61,7 @@ end
 
 function find_rips(u::AbstractFieldFunction, pml::PMLGeometry, ζ₋, ζ₊; kwargs...)::Vector{Rip2D}
     u_pml_coords(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
-    return find_rips(kwargs...)
+    return find_rips(u_pml_coords, ζ₋, ζ₊; kwargs...)
 end
 
 function find_rips(field_fnc::Function, ζ₋, ζ₊; Nζ=101, ν=1.0-1e-9, ε=1e-5, δ=1e-1, verbose=true)::Vector{Rip2D}
