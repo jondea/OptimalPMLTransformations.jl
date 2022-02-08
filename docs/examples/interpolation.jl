@@ -4,42 +4,22 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 62714408-c270-40a5-be3a-bfe618da1051
+# ╔═╡ adda20b5-a788-40da-8d1c-38b71f03d69f
 begin
-	import Pkg
-	Pkg.activate(mktempdir())
-end
+    import Pkg
+    # activate the shared project environment
+    Pkg.activate(Base.current_project())
+    # instantiate, i.e. make sure that all packages are downloaded
+    Pkg.instantiate()
 
-# ╔═╡ 8c51cda7-0ea0-4c00-891d-fc9bd2134c85
-begin
-	using Revise
-	Pkg.add(url="https://github.com/jondea/InverseHankelFunction.jl")
-	# Pkg.develop(url="https://github.com/jondea/OptimalPMLTransformations.jl")
-	Pkg.develop(path="/home/jondea/phd/OptimalPMLTransformations.jl")
-	using OptimalPMLTransformations
-end
-
-# ╔═╡ d6be7663-668d-4b50-b5d2-2f28ab97907a
-begin
-    Pkg.add(["Tau", "CubicHermiteSpline","FastGaussQuadrature"])
+	using OptimalPMLTransformations, LinearAlgebra
     using Tau, CubicHermiteSpline, FastGaussQuadrature
-end
-
-# ╔═╡ 1865da27-c3bf-4a86-9a39-59d1cb5eb9d6
-begin
-    Pkg.add(["IterTools"])
+	using Revise
     using IterTools
-end
-
-# ╔═╡ 03f266ac-06b7-11ec-0f78-bd1c4b925d06
-begin
-    Pkg.add(["Plots", "PlotlyJS"])
-    using Plots
+	using Plots
+	import PlotlyJS
 	plotlyjs()
 end
-
-# ╔═╡ 2923b1e2-bdfd-42f9-b955-ca9dc565497e
-using LinearAlgebra
 
 # ╔═╡ 2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
 md"# Adaptive interpolation and integration of optimal PML transformation"
@@ -383,12 +363,7 @@ optimal_transformation_objective(u, U, ν) = u - U*(1-ν)
 # ╠═1e43a2e2-ebc9-4db2-8978-01bee664a02a
 # ╠═f69cf5df-49b9-495a-b769-d283aea4e29a
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
-# ╠═62714408-c270-40a5-be3a-bfe618da1051
-# ╠═8c51cda7-0ea0-4c00-891d-fc9bd2134c85
-# ╠═d6be7663-668d-4b50-b5d2-2f28ab97907a
-# ╠═1865da27-c3bf-4a86-9a39-59d1cb5eb9d6
-# ╠═03f266ac-06b7-11ec-0f78-bd1c4b925d06
-# ╠═2923b1e2-bdfd-42f9-b955-ca9dc565497e
+# ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
 # ╠═6a9a44c6-83e0-4756-941b-7e271756d4f3
 # ╟─15c527af-a483-4bfa-95e0-374b0dbbd22f
 # ╠═535dc5ec-506a-4afe-9d44-7657deb852f8
