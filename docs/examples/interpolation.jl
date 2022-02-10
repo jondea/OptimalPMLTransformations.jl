@@ -12,14 +12,18 @@ begin
     # instantiate, i.e. make sure that all packages are downloaded
     Pkg.instantiate()
 
-	using OptimalPMLTransformations, LinearAlgebra
+	using PlutoUI, PlutoLinks
+	using LinearAlgebra
     using Tau, CubicHermiteSpline, FastGaussQuadrature
-	using Revise
     using IterTools
+	using StaticArrays
 	using Plots
 	import PlotlyJS
 	plotlyjs()
 end
+
+# ╔═╡ db122fd6-b0c9-4e60-b3c0-6b990e9e3619
+@revise using OptimalPMLTransformations
 
 # ╔═╡ 2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
 md"# Adaptive interpolation and integration of optimal PML transformation"
