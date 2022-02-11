@@ -48,10 +48,12 @@ end
 truenamedtuple(nt) = nt(ntuple(_->true, length(nt.body.parameters[1])))
 
 padding_needed(::Type{NamedTuple{(:u,)}}) = Val{0}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tθ)}}) = Val{0}()
 padding_needed(::Type{NamedTuple{(:∂u_∂tr,)}}) = Val{1}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr)}}) = Val{1}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ)}}) = Val{1}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2)}}) = Val{2}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ)}}) = Val{2}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}}) = Val{3}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}}) = Val{3}()
 
@@ -71,7 +73,7 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :�
 
     polar_coords = convert(PolarCoordinates, p, pml)
 
-    (u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}, polar_coords)
+    (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}, polar_coords)
 
     ∂tr_∂tν = pml.δ
 
@@ -81,6 +83,43 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :�
     ∂2u_∂tν∂tζ = ∂2u_∂tr∂tθ*∂tr_∂tν
     ∂3u_∂tν3 = ∂3u_∂tr3*∂tr_∂tν^3
     return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ, ∂3u_∂tν3)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tζ)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tθ)  = f(NamedTuple{(:u, :∂u_∂tθ)}, polar_coords)
+
+    ∂u_∂tζ = ∂u_∂tθ
+    return (;u, ∂u_∂tζ)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tr)  = f(NamedTuple{(:u, :∂u_∂tr)}, polar_coords)
+
+    ∂tr_∂tν = pml.δ
+
+    ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
+    return (;u, ∂u_∂tν)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ)}, polar_coords)
+
+    ∂tr_∂tν = pml.δ
+
+    ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
+    ∂u_∂tζ = ∂u_∂tθ
+    ∂2u_∂tν2 = ∂2u_∂tr2*∂tr_∂tν^2
+    ∂2u_∂tν∂tζ = ∂2u_∂tr∂tθ*∂tr_∂tν
+    return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ)
 end
 
 diffbesselj(ν, z, h=besselj(ν, z), hm1=besselj(ν-1, z)) = hm1 - ν/z*h

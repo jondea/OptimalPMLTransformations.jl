@@ -79,6 +79,12 @@ md"## Find rips"
 # ╔═╡ 611b863a-796f-4b42-8eab-f4b31888e140
 rips = classify_outer_boundary(u, pml, 0, 2π; Nζ=101, ε=1e-5, δ=1e-1, verbose=false)
 
+# ╔═╡ 6f70d51b-220c-4e86-a96d-8432c6ed113c
+OptimalPMLTransformations.pole_newton_solve(u, pml, 0.350885, 6.15284, -0.474182+0.482679im)
+
+# ╔═╡ 01ba5c71-ba6e-4909-a9da-aa51ba591851
+import OptimalPMLTransformations.pole_newton_solve
+
 # ╔═╡ d8c6957a-8cbd-422b-b77c-4f842b7238d2
 md"""
 ## Approximation through the PML
@@ -209,9 +215,12 @@ function interpolant(PMLFieldFunction, ζ::AbstractVector)
 end
 
 # ╔═╡ 404da5d5-737d-4df9-b3e1-6fac3038eb5c
-struct PMLFieldFunction{F<:AbstractFieldFunction,P<:PMLGeometry}
-	u::F
-	pml::P
+begin
+	struct PMLFieldFunction{F<:AbstractFieldFunction,P<:PMLGeometry}
+		u::F
+		pml::P
+	end
+	(u_pml::PMLFieldFunction)(NT, ν, ζ) = u_pml.u(NT, PMLCoordinates(ν, ζ), u_pml.pml)
 end
 
 # ╔═╡ 8e497f14-8f77-45b9-8843-bc65e20a61d5
@@ -229,16 +238,12 @@ function interpolant(PMLFieldFunction, ζ::Number; ν_max=1.0)
 end
 
 # ╔═╡ ec66435f-aeb2-472e-91f4-d510d801cdf0
-function find_rip(u_pml::PMLFieldFunction, ν0::Real, ζ0::Real, tν0::Number; ε=1e-12)
-
-    ν = ν0
-    ζ = ζ0
-    tν = tν0
+function find_rip(u_pml::PMLFieldFunction, ν::Real, ζ::Real, tν::Number; ε=1e-12)
 
     x = SA[ν, ζ, real(tν), imag(tν)]
-
-	U, dU_dζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0, ζ)
-	u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}, tν, ζ)
+	
+	U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0+0.0im, ζ)
+	(;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ) = u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}, tν, ζ)
 
     # Create vector of residuals
 	o_rip = ∂u_∂tν
@@ -246,15 +251,14 @@ function find_rip(u_pml::PMLFieldFunction, ν0::Real, ζ0::Real, tν0::Number; �
     r = SA[real(o_rip), imag(o_rip), real(o_opt), imag(o_opt)]
 	
     n_iter = 1
-    while maximum(abs.(r)) > ε*abs(U) && n_iter < 1000
-
+    while maximum(abs.(r)) > ε*abs(U) && n_iter < 100
         # Create Jacobian of objectives and unknowns
-        ∂o_opt_∂ζ = ∂u_∂tζ - ∂u_∂tζ*(1-ν)
+        ∂o_opt_∂ζ = ∂u_∂tζ - ∂U_∂tζ*(1-ν)
         J = SA[
             0        real(∂2u_∂tν∂tζ)  real(∂2u_∂tν2)  -imag(∂2u_∂tν2);
             0        imag(∂2u_∂tν∂tζ)  imag(∂2u_∂tν2)   real(∂2u_∂tν2);
-            real(u)  real(∂o_opt_∂ζ)   real(∂u_∂tν)    -imag(∂u_∂tν)  ;
-            imag(u)  imag(∂o_opt_∂ζ)   imag(∂u_∂tν)     real(∂u_∂tν)
+            real(U)  real(∂o_opt_∂ζ)   real(∂u_∂tν)    -imag(∂u_∂tν)  ;
+            imag(U)  imag(∂o_opt_∂ζ)   imag(∂u_∂tν)     real(∂u_∂tν)
         ]
 
         # Perform Newton step
@@ -265,8 +269,8 @@ function find_rip(u_pml::PMLFieldFunction, ν0::Real, ζ0::Real, tν0::Number; �
         ζ = x[2]
         tν = x[3] + im*x[4]
 
-        # Recompute field and residual at new point
-		U, dU_dζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0, ζ)
+		# Recompute field and residual at new point
+		U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0, ζ)
 		u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ= u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}, tν, ζ)
 
 		o_rip = ∂u_∂tν
@@ -282,15 +286,21 @@ end
 consecutive_pairs(r) = partition(r, 2, 1)
 
 # ╔═╡ 76701429-c0dd-454e-98fd-4e27a097898b
-function Base.argmin(f::Function, l1::InterpLine, l2::InterpLine)
-	f1, i1 = findmin(f, l1.points)
-	f2, i2 = findmin(f, l2.points)
-	f1 < f2 ? l1.points[i1] : l2.points[i2]
+begin
+	import Base: argmax
+	function argmax(f::Function, l1::InterpLine, l2::InterpLine)
+		f1, i1 = findmax(f, l1.points)
+		f2, i2 = findmax(f, l2.points)
+		f1 < f2 ? (l1, l1.points[i1]) : (l2, l2.points[i2])
+	end
 end
 
 # ╔═╡ 973df994-bb15-4681-a6e6-bde44766c046
 function relative_l2_difference(line1::InterpLine, line2::InterpLine)
-	knots = 0:0.01:1.0
+	νs1 = map(p->p.ν, line1.points)
+	νs2 = map(p->p.ν, line2.points)
+	max_common_ν = min(maximum(νs1), maximum(νs2))
+	knots = filter(ν->ν<=max_common_ν, sort(vcat(νs1, νs2)))
 	line1_points = line1.(knots)
 	line2_points = line2.(knots)
 	rel_diff = (2*norm(line1_points - line2_points)
@@ -299,17 +309,27 @@ function relative_l2_difference(line1::InterpLine, line2::InterpLine)
 end
 
 # ╔═╡ a74672a6-008a-43bc-b07e-1581064f3d02
-function find_rips!(rips::Vector{Rip2D}, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-5, δ=1e-1, tν_metric=relative_l2_difference)::Vector{Rip2D}
+function find_rips!(rips::Vector{Rip2D}, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference)::Vector{Rip2D}
 
 	tν₋ = interpolant(u_pml, first(ζs))
 	for (ζ₋, ζ₊) in consecutive_pairs(ζs)
-		tν₊ = interpolant(u_pml, first(ζs))
-		if abs(ζ₊ - ζ₋) < δ
-			rip_guess = argmin(p->p.∂u_∂tν, tν₋, tν₊)
-			νᵣ, ζᵣ, tνᵣ = find_rip(u_pml, rip_guess.ν, rip_guess.ζ, rip_guess.tν)
-			push!(rips, Rip2D(νᵣ, ζᵣ, tνᵣ))
-		elseif tν_metric(tν₋,tν₊) > ε
-			find_rips!(rips, range(ζ₋, ζ₊, length=3); ε, δ)
+		tν₊ = interpolant(u_pml, ζ₊)
+		if tν_metric(tν₋,tν₊) > ε
+			if abs(ζ₊ - ζ₋) < δ
+				# Find mostly likely point for rip along the two lines to use as an initial guess
+				p₋ = argmax(p->abs((1-p.ν)*p.∂tν_∂ν), tν₋.points)
+				p₊ = argmax(p->abs((1-p.ν)*p.∂tν_∂ν), tν₊.points)
+				νᵣ = (p₋.ν + p₊.ν)/2
+				tνᵣ = (p₋.tν + p₊.tν)/2
+				ζᵣ = (ζ₊ + ζ₋)/2
+				νᵣ, ζᵣ, tνᵣ = find_rip(u_pml, νᵣ, ζᵣ, tνᵣ)
+				if !(ζ₋ <= ζᵣ <= ζ₊)
+					@warn "ζ from find_rip was outside of range $ζ₋ $ζᵣ $ζ₊"
+				end
+				push!(rips, Rip2D(ζᵣ, νᵣ, tνᵣ))
+			else
+				find_rips!(rips, u_pml, range(ζ₋, ζ₊, length=3); ε, δ)
+			end
 		end
 		tν₋ = tν₊
 	end
@@ -327,11 +347,27 @@ end
 # ╔═╡ 92a2f127-bdaa-4ab9-90f3-68c2b6b0fc49
 find_rips(u_pml, range(0, τ, length=5))
 
+# ╔═╡ 46ae12d1-593c-4eef-a324-ae53f3192896
+function relative_max_difference(line1::InterpLine, line2::InterpLine)
+	νs1 = map(p->p.ν, line1.points)
+	νs2 = map(p->p.ν, line2.points)
+	max_common_ν = min(maximum(νs1), maximum(νs2))
+	knots = filter(ν->ν<=max_common_ν, sort(vcat(νs1, νs2)))
+	line1_points = line1.(knots)
+	line2_points = line2.(knots)
+	rel_diff = maximum((2 .* abs.(line1_points - line2_points))
+		./(abs.(line1_points) .+ abs.(line2_points)))
+	return rel_diff
+end
+
 # ╔═╡ 8f2e628f-14d3-4fe1-941d-d6c99caa7679
 rip_objective(field::Union{NamedTuple,InterpPoint}) = field.∂u_∂tν
 
 # ╔═╡ bb96f896-48e0-4d38-8ea2-85378ea4c6cc
 optimal_transformation_objective(u, U, ν) = u - U*(1-ν)
+
+# ╔═╡ f4adc5b8-6dfd-45d1-afd9-f5002f134b0b
+
 
 # ╔═╡ Cell order:
 # ╟─2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
@@ -346,8 +382,10 @@ optimal_transformation_objective(u, U, ν) = u - U*(1-ν)
 # ╠═8e497f14-8f77-45b9-8843-bc65e20a61d5
 # ╟─3c75cc96-a8d8-4f9d-b78d-3205108e1686
 # ╠═611b863a-796f-4b42-8eab-f4b31888e140
+# ╠═6f70d51b-220c-4e86-a96d-8432c6ed113c
 # ╠═92a2f127-bdaa-4ab9-90f3-68c2b6b0fc49
 # ╠═a74672a6-008a-43bc-b07e-1581064f3d02
+# ╠═01ba5c71-ba6e-4909-a9da-aa51ba591851
 # ╠═d68dbba7-eac0-44c2-af0c-08fa5638e954
 # ╠═ec66435f-aeb2-472e-91f4-d510d801cdf0
 # ╟─d8c6957a-8cbd-422b-b77c-4f842b7238d2
@@ -368,6 +406,7 @@ optimal_transformation_objective(u, U, ν) = u - U*(1-ν)
 # ╠═f69cf5df-49b9-495a-b769-d283aea4e29a
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 # ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
+# ╠═db122fd6-b0c9-4e60-b3c0-6b990e9e3619
 # ╠═6a9a44c6-83e0-4756-941b-7e271756d4f3
 # ╟─15c527af-a483-4bfa-95e0-374b0dbbd22f
 # ╠═535dc5ec-506a-4afe-9d44-7657deb852f8
@@ -376,5 +415,7 @@ optimal_transformation_objective(u, U, ν) = u - U*(1-ν)
 # ╠═02105c89-d058-4cea-ae12-0481eacb6fdc
 # ╠═76701429-c0dd-454e-98fd-4e27a097898b
 # ╠═973df994-bb15-4681-a6e6-bde44766c046
+# ╠═46ae12d1-593c-4eef-a324-ae53f3192896
 # ╠═8f2e628f-14d3-4fe1-941d-d6c99caa7679
 # ╠═bb96f896-48e0-4d38-8ea2-85378ea4c6cc
+# ╠═f4adc5b8-6dfd-45d1-afd9-f5002f134b0b
