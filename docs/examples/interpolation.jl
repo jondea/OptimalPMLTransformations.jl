@@ -146,9 +146,100 @@ intrp.continuous_region[1].lines[1].tν
 # ╔═╡ f69cf5df-49b9-495a-b769-d283aea4e29a
 gausslegendre(5)
 
+# ╔═╡ d90de796-b4a9-4d0f-85e1-de467e1f486a
+md"""
+# Integration
+
+
+
+"""
+
+# ╔═╡ a76d38f4-e226-4a63-a2a8-8fbd78f760d2
+md"## Patches"
+
+# ╔═╡ 870e31eb-50e4-4c09-a596-f7c4033ef0f3
+struct InterpPatchIterator
+	intrp0::InterpLine
+	intrp1::InterpLine
+end
+
+# ╔═╡ 979f80ee-8b89-4968-a9f8-b7fb64d1ed69
+function eachpatch(line0::InterpLine, line1::InterpLine)
+	InterpPatchIterator(line0, line1)
+end
+
+# ╔═╡ b649d62d-5c3c-432a-9b88-286698ad3a54
+let
+	plot(xlabel="ζ", ylabel="ν")
+	line1 = intrp.continuous_region[1].lines[end-1]
+	line2 = intrp.continuous_region[1].lines[end]
+	patches = InterpPatch[]
+	for patch in eachpatch(line1, line2)
+		push!(patches, patch)
+	end
+	
+	plot!(fill(line1.ζ, length(line1.points)), [p.ν for p in line1.points], marker=true, label="Line 2 knots")
+	plot!(fill(line2.ζ, length(line2.points)), [p.ν for p in line2.points], marker=true,
+		label="Line 1 knots")
+	hline!([patch.p00.ν for patch in patches], label="Patch ν")
+end
+
+# ╔═╡ bcb71114-b6aa-413b-a407-0bf9c6581611
+function Base.iterate(::InterpPatchIterator, state)
+
+	if isempty(state.intrp_points0) || isempty(state.intrp_points1)
+		return nothing
+	end
+	
+	# If one is smaller than the other, use the point with the smallest ν,
+	# popping it to show it has been used. Interpolate by peeking forward for the other
+	if peek(state.intrp_points0).ν > peek(state.intrp_points1).ν
+		intrp11 = popfirst!(state.intrp_points1)
+		intrp10 = eval_hermite_patch(state.intrp00, peek(state.intrp_points0), intrp11.ν)
+	elseif peek(state.intrp_points1).ν > peek(state.intrp_points0).ν
+		intrp10 = popfirst!(state.intrp_points0)
+		intrp11 = eval_hermite_patch(state.intrp01, peek(state.intrp_points1), intrp10.ν)
+	else # Equal, use both
+		intrp10 = popfirst!(state.intrp_points0)
+		intrp11 = popfirst!(state.intrp_points1)
+	end
+
+	patch = InterpPatch(state.intrp00, state.intrp01, intrp10, intrp11)
+		
+	(patch, (;state.intrp_points0, state.intrp_points1, intrp00=intrp10, intrp01=intrp11))
+end
+
+# ╔═╡ 2852e29e-1e26-4d9c-9ab5-850910c0af32
+function Base.iterate(it::InterpPatchIterator)
+	intrp_points0 = Base.Iterators.Stateful(it.intrp0.points)
+    intrp_points1 = Base.Iterators.Stateful(it.intrp1.points)
+
+	if isempty(intrp_points0) || isempty(intrp_points1)
+		return nothing
+	end
+
+	intrp00 = popfirst!(intrp_points0)
+    intrp01 = popfirst!(intrp_points1)
+
+	# Set up initial state then delegate to stateful iterate function
+	Base.iterate(it, (;intrp_points0, intrp_points1, intrp00, intrp01))
+end
+
+# ╔═╡ e9177290-a364-427f-b4cf-7252baa4fd1e
+let
+	patches = InterpPatch[]
+	for patch in eachpatch(intrp.continuous_region[1].lines[1], intrp.continuous_region[1].lines[2])
+		push!(patches, patch)
+	end
+	patches
+end
+
+# ╔═╡ ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
+md"## Integration over patches"
+
 # ╔═╡ 815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 md"""
-## Technical bits
+# Appendix
 """
 
 # ╔═╡ 6a9a44c6-83e0-4756-941b-7e271756d4f3
@@ -252,8 +343,62 @@ function interpolation_line(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0)
 	return InterpLine(ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs)
 end
 
+# ╔═╡ a65842cc-3ca2-40c6-a4f5-b7953648da16
+f1(x) = x
+
+# ╔═╡ bead3803-4652-48de-8e05-74f608e01fb4
+f2(x) = x+1
+
+# ╔═╡ be80a489-8b3a-467d-8a3b-27633057815d
+begin
+	struct ExactPatch{PMLFF <: PMLFieldFunction}
+		ζ0::Float64
+		ζ1::Float64
+		patch::InterpPatch
+		u_pml::PMLFF
+	end
+	(ep::ExactPatch)(ν::Number, ζ::Number) = evalute_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ep.ζ0, ep.ζ1, ν, ζ)
+	(ep::ExactPatch)(νζ::AbstractVector) = ep(νζ[1], νζ[2])
+end
+
+# ╔═╡ 036ad3b0-29a5-4f1a-bc67-e074868077c4
+function hcubature(patch::ExactPatch, integrand; kwargs...)
+	I, E = hcubature(integrand ∘ patch, SA[patch.patch.interp11.ν, patch.ζ0], SA[patch.patch.interp00.ν, patch.ζ1]; kwargs...)
+end
+
+# ╔═╡ 7d7f969f-f2fa-4bd4-91ce-50d404f8ff2b
+integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
+
+# ╔═╡ 7c1fefaa-33a4-409e-8fc5-4d3aa9b3eb1d
+
+
 # ╔═╡ 02105c89-d058-4cea-ae12-0481eacb6fdc
 consecutive_pairs(r) = partition(r, 2, 1)
+
+# ╔═╡ 9b4db41e-b506-421b-916a-8791be13d275
+patches = let
+	patches = InterpPatch[]
+	for region in intrp.continuous_region
+		for (line1, line2) in consecutive_pairs(region.lines)
+			for patch in eachpatch(line1, line2)
+				push!(patches, patch)
+			end
+		end
+	end
+	patches
+end
+
+# ╔═╡ 94db42d3-3b2f-46d1-9d91-50f2a57b701b
+f3 = f1 ∘ ExactPatch(0.1, 0.2, patches[1], u_pml)
+
+# ╔═╡ 26f53057-722c-484f-a932-e964ab0f2404
+f4 = f1 ∘ ExactPatch(0.1, 0.2, patches[1], u_pml)
+
+# ╔═╡ 704e5aad-913e-45fa-ba27-3ced3458c81c
+typeof(f3) === typeof(f4)
+
+# ╔═╡ 04289d7b-d973-4a5c-82d0-3ee8a596e26a
+OptimalPMLTransformations.continue_in_ζ(u_pml, args...; kwargs...) = continue_in_ζ(u_pml.u, u_pml.pml, args...; kwargs...)
 
 # ╔═╡ 76701429-c0dd-454e-98fd-4e27a097898b
 begin
@@ -350,33 +495,32 @@ let
 end
 
 # ╔═╡ 3014f1ba-3bce-43a2-bf84-e22d08aabd38
-function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference, tν₊=interpolation_line(u_pml, last(ζs)))::Vector{Rip2D}
+function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference, tν₊=interpolation_line(u_pml, last(ζs)))::Interpolation
 
-	tν₁ = last(last(interp.continous_region).lines)
+	tν₁ = last(last(intrp.continuous_region).lines)
 	for (ζ₁, ζ₂) in consecutive_pairs(ζs)
-		tν₂ = (ζ₂ == ζ₊) ? tν₊ : interpolation_line(u_pml, ζ₂)
+		tν₂ = (ζ₂ == last(ζs)) ? tν₊ : interpolation_line(u_pml, ζ₂)
 		if tν_metric(tν₁,tν₂) > ε
 			if abs(ζ₂ - ζ₁) < δ
 				rip = find_rip(u_pml, tν₁, tν₂)
-
+				rip_interp_point = InterpPoint(rip.ν, rip.tν, NaN+im*NaN, NaN+im*NaN)
+				
 				push!(intrp, tν₁)
 				
 				# Add line on rip, continued from below
-				tν_rip₋ = continue_in_ζ(u_pml, ζ_rip, tν₁)
-				insertsorted!(tν_rip₋.points, rip; by=p->p.ν)
+				tν_rip₋ = continue_in_ζ(u_pml, rip.ζ, tν₁)
+				insertsorted!(tν_rip₋.points, rip_interp_point; by=p->p.ν)
 				push!(intrp, tν_rip₋)
 
 				# Adding a rip severs the two domains
-				push!(intrp, rip)
+				push!(intrp, Rip(rip.ζ))
 				
 				# Add line on rip, continued from above
-				tν_rip₊ = continue_in_ζ(u_pml, ζ_rip, tν₂)
-				insertsorted!(tν_rip₊.points, rip; by=p->p.ν)
+				tν_rip₊ = continue_in_ζ(u_pml, rip.ζ, tν₂)
+				insertsorted!(tν_rip₊.points, rip_interp_point; by=p->p.ν)
 				push!(intrp, tν_rip₊)
 
 				push!(intrp, tν₂)
-
-				return
 			else
 				# Recursively split domain into 2 regions (3 points with ends)
 				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ)
@@ -397,17 +541,19 @@ Add a rip if the division in ζ is <δ.
 """
 function interpolation(u_pml::PMLFieldFunction, ζs::AbstractVector; kwargs...)::Interpolation
 
-	intrp = Interpolation()
-	tν₋ = interpolation(u_pml, first(ζs))
-	push!(intrp, tν₋)
+	tν₋ = interpolation_line(u_pml, first(ζs))
+	intrp = Interpolation(tν₋)
 
-	tν₊ = interpolation(u_pml, last(ζs))
-	adaptively_append!(intrp, ζs; tν₊, kwargs...)
+	tν₊ = interpolation_line(u_pml, last(ζs))
+	adaptively_append!(intrp, u_pml, ζs; tν₊, kwargs...)
 	push!(intrp, tν₊)
 
 	return intrp
 
 end
+
+# ╔═╡ 9ebd6543-be73-4e30-a45d-4038c8299e8f
+intrp2 = interpolation(u_pml, -τ/8:τ/32:τ/8)
 
 # ╔═╡ 46ae12d1-593c-4eef-a324-ae53f3192896
 function relative_max_difference(line1::InterpLine, line2::InterpLine)
@@ -460,6 +606,7 @@ html"""
 # ╟─5a99aa34-151f-40b1-95b5-eba87ee4d5fb
 # ╠═d893b9d4-08ac-4693-8016-e0b857c07dba
 # ╠═3014f1ba-3bce-43a2-bf84-e22d08aabd38
+# ╠═9ebd6543-be73-4e30-a45d-4038c8299e8f
 # ╟─f5faa6af-9bb2-41ec-9517-579fc41db3e2
 # ╠═53a2dc51-6684-468d-b95a-6fea0937269e
 # ╠═e57e4592-4e66-45ca-b0ad-7fd32e1bdd5d
@@ -472,6 +619,17 @@ html"""
 # ╠═3528e9f7-75b6-4e7b-9937-de7dbdcf1bc9
 # ╠═1e43a2e2-ebc9-4db2-8978-01bee664a02a
 # ╠═f69cf5df-49b9-495a-b769-d283aea4e29a
+# ╟─d90de796-b4a9-4d0f-85e1-de467e1f486a
+# ╟─a76d38f4-e226-4a63-a2a8-8fbd78f760d2
+# ╠═b649d62d-5c3c-432a-9b88-286698ad3a54
+# ╠═979f80ee-8b89-4968-a9f8-b7fb64d1ed69
+# ╠═870e31eb-50e4-4c09-a596-f7c4033ef0f3
+# ╠═2852e29e-1e26-4d9c-9ab5-850910c0af32
+# ╠═bcb71114-b6aa-413b-a407-0bf9c6581611
+# ╠═e9177290-a364-427f-b4cf-7252baa4fd1e
+# ╠═9b4db41e-b506-421b-916a-8791be13d275
+# ╟─ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
+# ╠═036ad3b0-29a5-4f1a-bc67-e074868077c4
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 # ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
 # ╠═db122fd6-b0c9-4e60-b3c0-6b990e9e3619
@@ -480,7 +638,16 @@ html"""
 # ╠═535dc5ec-506a-4afe-9d44-7657deb852f8
 # ╠═b1d5ef17-7a3e-4a8e-8387-a04d75018fa0
 # ╠═404da5d5-737d-4df9-b3e1-6fac3038eb5c
+# ╠═a65842cc-3ca2-40c6-a4f5-b7953648da16
+# ╠═bead3803-4652-48de-8e05-74f608e01fb4
+# ╠═94db42d3-3b2f-46d1-9d91-50f2a57b701b
+# ╠═26f53057-722c-484f-a932-e964ab0f2404
+# ╠═704e5aad-913e-45fa-ba27-3ced3458c81c
+# ╠═be80a489-8b3a-467d-8a3b-27633057815d
+# ╠═7d7f969f-f2fa-4bd4-91ce-50d404f8ff2b
+# ╠═7c1fefaa-33a4-409e-8fc5-4d3aa9b3eb1d
 # ╠═02105c89-d058-4cea-ae12-0481eacb6fdc
+# ╠═04289d7b-d973-4a5c-82d0-3ee8a596e26a
 # ╠═76701429-c0dd-454e-98fd-4e27a097898b
 # ╠═973df994-bb15-4681-a6e6-bde44766c046
 # ╠═46ae12d1-593c-4eef-a324-ae53f3192896
