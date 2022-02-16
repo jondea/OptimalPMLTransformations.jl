@@ -95,6 +95,10 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     # Try to guess what will be a good size for the next step without going past our max
     h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
 
+    # Store h_prev for a kind of momentum, we half the failed step when things are bad,
+    # but we at most double the previous when things look better
+    h_prev = h
+
     # Keep going until we get to our target
     while ν < ν_max
 
@@ -159,6 +163,10 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             t_prev  = t
             ν_prev  = ν
             tν_prev = tν
+            h_prev = h
+
+            # Reset stepsize, try to guess what will be a good size for the next step without going past our max
+            h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν, 2*h_prev)
         else
             # Reject the step and reduce step size
             # Go back to previous
