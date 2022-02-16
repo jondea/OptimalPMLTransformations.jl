@@ -1,8 +1,7 @@
 
 function integrate(intrp::InterpLine, f::Function; order=2)
-    knots, weights = gausslegendre(order)
-    knots .= (knots .+ 1)./2
-    weights ./= 2
+    knots, weights = gausslegendreunit(order)
+
     # Note to self, write iterator over spline patches
     # so that this algorithm is O(N) rather than O(N^2)
     intrp_it = Base.Iterators.Stateful(intrp.points)
@@ -56,9 +55,7 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
     intrp_points1 = Base.Iterators.Stateful(tν_interp1.points)
 
     # Get knots and weights and normalise for [0,1]
-    knots, weights = gausslegendre(order)
-    knots .= (knots .+ 1)./2
-    weights ./= 2
+    knots, weights = gausslegendreunit(order)
 
     intrp00 = popfirst!(intrp_points0)
     intrp01 = popfirst!(intrp_points1)
