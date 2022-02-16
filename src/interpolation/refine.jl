@@ -1,4 +1,26 @@
 
+function refine(i, u::AbstractFieldFunction, pml::PMLGeometry, n=1)
+    ri = deepcopy(i)
+    refine!(ri, u, pml, n)
+end
+
+function refine!(region::ContinuousInterpolation,  u::AbstractFieldFunction, pml::PMLGeometry, n=1)
+    for _ in 1:n
+        refine_in_ζ!(region, u, pml)
+    end
+    for line in region.lines
+        for _ in 1:n refine!(line, u, pml) end
+    end
+    region
+end
+
+function refine!(intrp::Interpolation,  u::AbstractFieldFunction, pml::PMLGeometry, n=1)
+    for region in intrp.continuous_region
+        refine!(region, u, pml, n)
+    end
+    intrp
+end
+
 function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
 
     ζ = line.ζ
