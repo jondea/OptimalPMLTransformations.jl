@@ -249,11 +249,14 @@ function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::
 
 end
 
-function evaluate(patch::InterpPatch, ζ0, ζ1, ν, ζ)::InterpPoint
+function evaluate(patch::InterpPatch, ν, ζ)::InterpPoint
     intrp00 = patch.p00
     intrp01 = patch.p01
     intrp10 = patch.p10
     intrp11 = patch.p11
+
+    ζ0 = patch.ζ0
+    ζ1 = patch.ζ1
 
     ν0 = intrp00.ν
     ν1 = intrp10.ν
@@ -272,8 +275,10 @@ function evaluate(patch::InterpPatch, ζ0, ζ1, ν, ζ)::InterpPoint
     end
 end
 
-function evalute_and_correct(u, pml, patch::InterpPatch, ζ0, ζ1, ν, ζ)
-    intrp = evaluate(patch, ζ0, ζ1, ν, ζ)
+(patch::InterpPatch)(ν::Number, ζ::Number) = evaluate(patch, ν, ζ)
+
+function evalute_and_correct(u, pml, patch::InterpPatch, ν, ζ)
+    intrp = evaluate(patch, ν, ζ)
     field_fnc(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν, ζ), pml)
     U_field = field_fnc(zero(complex(ν)))
     tν, field, converged = corrector(field_fnc, U_field.u, ν, intrp.tν)

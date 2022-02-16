@@ -19,6 +19,8 @@ struct InterpPatch
     p01::InterpPoint
     p10::InterpPoint
     p11::InterpPoint
+    ζ0::Float64
+    ζ1::Float64
 end
 
 function InterpLine(ζ::Float64, ν_vec::Vector{Float64}, tν_vec::Vector{ComplexF64}, ∂tν_∂ν_vec::Vector{ComplexF64}, ∂tν_∂ζ_vec::Vector{ComplexF64})
