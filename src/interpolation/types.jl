@@ -9,6 +9,9 @@ struct InterpPoint
     ∂tν_∂ζ::ComplexF64
 end
 
+import Base.zero
+zero(::Type{InterpPoint}) = InterpPoint(0, 0, 0, 0)
+
 struct InterpLine
     ζ::Float64
     points::Vector{InterpPoint}
