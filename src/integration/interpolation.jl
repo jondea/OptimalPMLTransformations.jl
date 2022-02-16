@@ -88,7 +88,7 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
             for (knot_ζ, weight_ζ) in zip(knots, weights)
                 ν = ν0 + knot_ν*δν
                 ζ = ζ0 + knot_ζ*δζ
-                intrp = evaluate(InterpPatch(intrp00,intrp01, intrp10, intrp11), ζ0, ζ1, ν, ζ)
+                intrp = evaluate(InterpPatch(intrp00,intrp01, intrp10, intrp11, ζ0, ζ1), ν, ζ)
                 integrand += f(intrp) * weight_ν * weight_ζ * δν * δζ
             end
         end
@@ -131,7 +131,7 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
 
     ν0 = min(intrp01.ν, intrp00.ν)
     ν1 = ν0
-    integrand = zero(f(InterpPatch(intrp00,intrp01,intrp00,intrp01), ζ0, ζ1, ν0, ζ0))
+    integrand = zero(f(InterpPatch(intrp00,intrp01,intrp00,intrp01, ζ0, ζ1), ν0, ζ0))
 
     while !isempty(intrp_points0) && !isempty(intrp_points1)
 
@@ -152,9 +152,9 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
 
         ν1 = intrp11.ν # == intrp10.ν
 
-        patch = InterpPatch(intrp00, intrp01, intrp10, intrp11)
+        patch = InterpPatch(intrp00, intrp01, intrp10, intrp11, ζ0, ζ1)
         function integrand_fnc(νζ)
-            ret = f(patch, ζ0, ζ1, νζ[1], νζ[2])
+            ret = f(patch, νζ[1], νζ[2])
             # @show νζ ret
             ret
         end
