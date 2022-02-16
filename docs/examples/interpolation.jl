@@ -18,6 +18,7 @@ begin
     using IterTools
 	using StaticArrays
 	using Plots
+	using HCubature
 	import PlotlyJS
 	plotlyjs()
 end
@@ -115,6 +116,9 @@ Then we perform the same procedure recursively between both initial approximatio
 If the difference persists, we stop recursively subdividing when the difference in ζ is less than some previously defined δ.
 """
 
+# ╔═╡ f2df6800-9d77-4eb4-bbca-e3244e7b4704
+intrp_old = interpolate(u, pml, -τ/8:τ/32:τ/8, 0.99999999)
+
 # ╔═╡ f5faa6af-9bb2-41ec-9517-579fc41db3e2
 md"### Plots of transformation"
 
@@ -131,21 +135,6 @@ md"""
 Rips happen when ∂u/∂r̃ = 0, so this is what we look for roots of to find the tip of the rip.
 """
 
-# ╔═╡ 7e27197b-5846-4929-aad1-906fcec388be
-intrp = interpolate(u, pml, -τ/8:τ/32:τ/8, 0.99)
-
-# ╔═╡ ee98c760-e894-4b6a-9128-7838966bb838
-intrp.continuous_region[1].lines[1].tν.x
-
-# ╔═╡ 3528e9f7-75b6-4e7b-9937-de7dbdcf1bc9
-intrp.continuous_region[1].lines[1].tν
-
-# ╔═╡ 1e43a2e2-ebc9-4db2-8978-01bee664a02a
-
-
-# ╔═╡ f69cf5df-49b9-495a-b769-d283aea4e29a
-gausslegendre(5)
-
 # ╔═╡ d90de796-b4a9-4d0f-85e1-de467e1f486a
 md"""
 # Integration
@@ -153,6 +142,15 @@ md"""
 
 
 """
+
+# ╔═╡ cd10dda6-fc70-48a1-9e3d-c4f68407f628
+md"## Integrand"
+
+# ╔═╡ fe0b3413-098a-48b2-b280-041f27e1d69c
+integrand(ν::Number, ∂tν_∂ν::Number) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂tν_∂ν
+
+# ╔═╡ 19ba6e3e-8b9c-48ae-8daa-36d5f8aa3e0b
+integrand(p::InterpPoint) = integrand(p.ν, p.∂tν_∂ν)
 
 # ╔═╡ a76d38f4-e226-4a63-a2a8-8fbd78f760d2
 md"## Patches"
@@ -168,24 +166,8 @@ function eachpatch(line0::InterpLine, line1::InterpLine)
 	InterpPatchIterator(line0, line1)
 end
 
-# ╔═╡ b649d62d-5c3c-432a-9b88-286698ad3a54
-let
-	plot(xlabel="ζ", ylabel="ν")
-	line1 = intrp.continuous_region[1].lines[end-1]
-	line2 = intrp.continuous_region[1].lines[end]
-	patches = InterpPatch[]
-	for patch in eachpatch(line1, line2)
-		push!(patches, patch)
-	end
-	
-	plot!(fill(line1.ζ, length(line1.points)), [p.ν for p in line1.points], marker=true, label="Line 2 knots")
-	plot!(fill(line2.ζ, length(line2.points)), [p.ν for p in line2.points], marker=true,
-		label="Line 1 knots")
-	hline!([patch.p00.ν for patch in patches], label="Patch ν")
-end
-
 # ╔═╡ bcb71114-b6aa-413b-a407-0bf9c6581611
-function Base.iterate(::InterpPatchIterator, state)
+function Base.iterate(it::InterpPatchIterator, state)
 
 	if isempty(state.intrp_points0) || isempty(state.intrp_points1)
 		return nothing
@@ -204,7 +186,7 @@ function Base.iterate(::InterpPatchIterator, state)
 		intrp11 = popfirst!(state.intrp_points1)
 	end
 
-	patch = InterpPatch(state.intrp00, state.intrp01, intrp10, intrp11)
+	patch = InterpPatch(state.intrp00, state.intrp01, intrp10, intrp11, it.intrp0.ζ, it.intrp1.ζ)
 		
 	(patch, (;state.intrp_points0, state.intrp_points1, intrp00=intrp10, intrp01=intrp11))
 end
@@ -225,17 +207,45 @@ function Base.iterate(it::InterpPatchIterator)
 	Base.iterate(it, (;intrp_points0, intrp_points1, intrp00, intrp01))
 end
 
-# ╔═╡ e9177290-a364-427f-b4cf-7252baa4fd1e
-let
-	patches = InterpPatch[]
-	for patch in eachpatch(intrp.continuous_region[1].lines[1], intrp.continuous_region[1].lines[2])
-		push!(patches, patch)
-	end
-	patches
-end
+# ╔═╡ b8d942cb-76a0-419e-b883-f7a5a7762a8c
+# Plot simpler example with a few patches
 
 # ╔═╡ ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
-md"## Integration over patches"
+md"## Integration using interpolation"
+
+# ╔═╡ 4c35cb02-c2f4-43e5-8412-f80aed6142a1
+function integrate(patch::InterpPatch, integrand::Function;
+		gauss_order = 3, knots_and_weights = gausslegendreunit(gauss_order))
+	knots, weights = knots_and_weights
+	ζ0 = patch.ζ0
+    ζ1 = patch.ζ1
+    ν0 = patch.p00.ν
+    ν1 = patch.p10.ν
+	δν = ν1 - ν0
+	δζ = ζ1 - ζ0
+
+	integral = zero(integrand(zero(InterpPoint)))
+	for (knot_ν, weight_ν) in zip(knots, weights)
+		ν = ν0 + knot_ν*δν
+		for (knot_ζ, weight_ζ) in zip(knots, weights)
+			ζ = ζ0 + knot_ζ*δζ
+			integral += integrand(patch(ν, ζ)) * weight_ν * weight_ζ * δν * δζ
+		end
+	end
+	integral
+end
+
+# ╔═╡ bd1e3181-45be-451c-b5b3-cac2295a371a
+
+
+# ╔═╡ 264bbea2-2b3e-458b-b9fa-60146a0fb322
+# Adaptive?
+
+# ╔═╡ e0bcca99-d966-405f-9900-51f95c3ec6bd
+md"## Integration using adaptive quadrature (Genz-Malik)"
+
+# ╔═╡ 14050c73-5005-461f-91a6-4703c1ee2b67
+md"## Integration using transformed Gaussian quadrature"
 
 # ╔═╡ 815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 md"""
@@ -265,6 +275,22 @@ interpolate_and_plot(u, pml, :surface, 0:0.005:0.95, -τ/8:0.1:τ/8; f=∂tν_�
 
 # ╔═╡ 468bfd51-7eb3-48a2-b9a0-0c14749d3546
 interpolate_and_plot(u, pml, :surface, 0:0.005:0.95, -τ/8:0.1:τ/8; f=(l,ν)->abs(∂u_∂tr(u, PolarCoordinates(pml.R + l(ν), l.ζ))) )
+
+# ╔═╡ aa0d1c5a-81f3-4707-9616-50d5fe8e37e2
+md"""
+## Todo
+
+
+### Improvements
+
+- Replace integrals with mapreduce
+
+"""
+
+# ╔═╡ 9440d5f5-4939-4cb1-833a-cb39ad066091
+function hcubature(line1::InterpLine, line2::InterpLine; kwargs...)
+	mapreduce(patch->hcubature(patch, integrand; kwargs...)[1], +, eachpatch(line1, line2))
+end
 
 # ╔═╡ 15c527af-a483-4bfa-95e0-374b0dbbd22f
 md"## To go in library"
@@ -332,25 +358,11 @@ function find_rip(u_pml::PMLFieldFunction, ν::Real, ζ::Real, tν::Number; ε=1
     return Rip2D(ζ, ν, tν)
 end
 
-# ╔═╡ 535dc5ec-506a-4afe-9d44-7657deb852f8
-#Do not export
-function interpolation_line(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0)
-	νs = Float64[]
-	tνs = ComplexF64[]
-	∂tν_∂νs = ComplexF64[]
-	∂tν_∂ζs = ComplexF64[]
-	optimal_pml_transformation_solve(u_pml.u, u_pml.pml, ν_max, ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs; silent_failure=true)
-	return InterpLine(ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs)
-end
-
-# ╔═╡ a65842cc-3ca2-40c6-a4f5-b7953648da16
-f1(x) = x
-
-# ╔═╡ bead3803-4652-48de-8e05-74f608e01fb4
-f2(x) = x+1
-
 # ╔═╡ be80a489-8b3a-467d-8a3b-27633057815d
 begin
+	"""
+	Use the InterpPatch as an initial guess, then solve to find the optimal pml transformation
+	"""
 	struct ExactPatch{PMLFF <: PMLFieldFunction}
 		ζ0::Float64
 		ζ1::Float64
@@ -366,36 +378,36 @@ function hcubature(patch::ExactPatch, integrand; kwargs...)
 	I, E = hcubature(integrand ∘ patch, SA[patch.patch.interp11.ν, patch.ζ0], SA[patch.patch.interp00.ν, patch.ζ1]; kwargs...)
 end
 
+# ╔═╡ 535dc5ec-506a-4afe-9d44-7657deb852f8
+#Do not export
+function interpolation_line(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0)
+	νs = Float64[]
+	tνs = ComplexF64[]
+	∂tν_∂νs = ComplexF64[]
+	∂tν_∂ζs = ComplexF64[]
+	optimal_pml_transformation_solve(u_pml.u, u_pml.pml, ν_max, ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs; silent_failure=true)
+	return InterpLine(ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs)
+end
+
 # ╔═╡ 7d7f969f-f2fa-4bd4-91ce-50d404f8ff2b
 integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
-
-# ╔═╡ 7c1fefaa-33a4-409e-8fc5-4d3aa9b3eb1d
-
 
 # ╔═╡ 02105c89-d058-4cea-ae12-0481eacb6fdc
 consecutive_pairs(r) = partition(r, 2, 1)
 
-# ╔═╡ 9b4db41e-b506-421b-916a-8791be13d275
-patches = let
-	patches = InterpPatch[]
+# ╔═╡ c8b81ba0-0f95-472c-8b32-735a03041777
+function integrate(intrp::Interpolation, integrand::Function;
+		gauss_order = 3, knots_and_weights = gausslegendreunit(gauss_order))
+	integral = zero(integrand(zero(InterpPoint)))
 	for region in intrp.continuous_region
 		for (line1, line2) in consecutive_pairs(region.lines)
 			for patch in eachpatch(line1, line2)
-				push!(patches, patch)
+				integral += integrate(patch, integrand; gauss_order, knots_and_weights)
 			end
 		end
 	end
-	patches
+	integral
 end
-
-# ╔═╡ 94db42d3-3b2f-46d1-9d91-50f2a57b701b
-f3 = f1 ∘ ExactPatch(0.1, 0.2, patches[1], u_pml)
-
-# ╔═╡ 26f53057-722c-484f-a932-e964ab0f2404
-f4 = f1 ∘ ExactPatch(0.1, 0.2, patches[1], u_pml)
-
-# ╔═╡ 704e5aad-913e-45fa-ba27-3ced3458c81c
-typeof(f3) === typeof(f4)
 
 # ╔═╡ 04289d7b-d973-4a5c-82d0-3ee8a596e26a
 OptimalPMLTransformations.continue_in_ζ(u_pml, args...; kwargs...) = continue_in_ζ(u_pml.u, u_pml.pml, args...; kwargs...)
@@ -494,6 +506,54 @@ let
 	scatter!(ν_vec, complex2cols(intrp.(ν_vec)), label=["real(knot)" "imag(knot)"], color=colors)
 end
 
+# ╔═╡ bd76575f-57f6-465b-a1c4-d94ac0ff7113
+function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
+	field_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)},
+		PMLCoordinates(tν,ζ), pml)
+
+	rips = find_rips(field_fnc_νζ, ζ_range[1], ζ_range[2], Nζ=21, ν=0.999, ε=1e-3)
+
+	ν_crit = only(rips).ν
+	ζ_crit = only(rips).ζ
+
+	ζ_width = ζ_range[2]-ζ_range[1]
+	
+	# Find singularity
+	s_crit = ((ζ_crit - ζ_range[1])/ζ_width, ν_crit)
+	
+	# Get Gauss-Legendre knot points and weights, and transform to [0,1]
+	nodes, weights = gausslegendre(integration_order)
+	nodes .= (nodes .+ 1)/2
+	weights .= weights./2
+
+	integral = 0.0 + 0.0im
+
+	n_knot = 1
+	for _ in 1:2integration_order # Loop around ζ
+		# Initialise stepping through and integrating
+		trans_node, _ = gausslegendretrans_mid(n_knot, nodes, weights, s_crit)
+		ζ = ζ_range[1] + trans_node[1] * ζ_width
+		ν = 0.0
+		ν_prev = ν
+		tν = 0.0 + 0.0im
+		tν_prev = tν
+		field_fnc_ν(tν) = field_fnc_νζ(tν, ζ)
+		U_field = field_fnc_ν(0.0+0.0im)
+		field = U_field
+		for _ in 1:2integration_order # Loop around ν
+			trans_node, trans_weight = gausslegendretrans_mid(n_knot, nodes, weights, s_crit)
+			ν = trans_node[2]
+			tν, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field = optimal_pml_transformation_solve(field_fnc_ν, ν; 					ν0=ν_prev, tν0=tν_prev, field0=field, U_field=U_field, householder_order=3)
+			integral += trans_weight*integrand(ν, ∂tν_∂ν)*ζ_width
+			
+			n_knot += 1
+			ν_prev = ν
+			tν_prev = tν
+		end
+	end
+	return integral
+end
+
 # ╔═╡ 3014f1ba-3bce-43a2-bf84-e22d08aabd38
 function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference, tν₊=interpolation_line(u_pml, last(ζs)))::Interpolation
 
@@ -519,11 +579,16 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 				tν_rip₊ = continue_in_ζ(u_pml, rip.ζ, tν₂)
 				insertsorted!(tν_rip₊.points, rip_interp_point; by=p->p.ν)
 				push!(intrp, tν_rip₊)
-
-				push!(intrp, tν₂)
+				if ζ₂ != last(ζs)
+					push!(intrp, tν₂)
+				end
 			else
 				# Recursively split domain into 2 regions (3 points with ends)
 				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ)
+			end
+		else
+			if ζ₂ != last(ζs)
+				push!(intrp, tν₂)
 			end
 		end
 		tν₁ = tν₂
@@ -546,14 +611,47 @@ function interpolation(u_pml::PMLFieldFunction, ζs::AbstractVector; kwargs...):
 
 	tν₊ = interpolation_line(u_pml, last(ζs))
 	adaptively_append!(intrp, u_pml, ζs; tν₊, kwargs...)
-	push!(intrp, tν₊)
 
 	return intrp
 
 end
 
 # ╔═╡ 9ebd6543-be73-4e30-a45d-4038c8299e8f
-intrp2 = interpolation(u_pml, -τ/8:τ/32:τ/8)
+intrp = interpolation(u_pml, -τ/8:τ/32:τ/8)
+
+# ╔═╡ e9177290-a364-427f-b4cf-7252baa4fd1e
+let
+	patches = InterpPatch[]
+	for patch in eachpatch(intrp.continuous_region[1].lines[1], intrp.continuous_region[1].lines[2])
+		push!(patches, patch)
+	end
+	patches
+end
+
+# ╔═╡ b649d62d-5c3c-432a-9b88-286698ad3a54
+let
+	plot(xlabel="ζ", ylabel="ν")
+	line1 = intrp.continuous_region[1].lines[end-1]
+	line2 = intrp.continuous_region[1].lines[end]
+	patches = InterpPatch[]
+	for patch in eachpatch(line1, line2)
+		push!(patches, patch)
+	end
+	
+	plot!(fill(line1.ζ, length(line1.points)), [p.ν for p in line1.points], marker=true, label="Line 2 knots")
+	plot!(fill(line2.ζ, length(line2.points)), [p.ν for p in line2.points], marker=true,
+		label="Line 1 knots")
+	hline!([patch.p00.ν for patch in patches], label="Patch ν")
+end
+
+# ╔═╡ b7a5e97a-4704-43b3-bb9c-f12f477339bc
+integrate(intrp, integrand)
+
+# ╔═╡ ddcdc2b3-f368-446a-b866-5e0dadd87f41
+integrate(refine(intrp, u, pml, 1), integrand)
+
+# ╔═╡ 3da741ce-f54f-4be7-b0e7-30df31814656
+integrate(refine(intrp, u, pml, 3), integrand)
 
 # ╔═╡ 46ae12d1-593c-4eef-a324-ae53f3192896
 function relative_max_difference(line1::InterpLine, line2::InterpLine)
@@ -583,6 +681,9 @@ html"""
 </style>
 """
 
+# ╔═╡ 3b56dfe1-ba2a-421f-8a1d-fb7e3667a814
+)
+
 # ╔═╡ Cell order:
 # ╟─2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
 # ╟─99cbcc12-ceae-4d7e-8b20-ed8d60de0a9c
@@ -607,6 +708,7 @@ html"""
 # ╠═d893b9d4-08ac-4693-8016-e0b857c07dba
 # ╠═3014f1ba-3bce-43a2-bf84-e22d08aabd38
 # ╠═9ebd6543-be73-4e30-a45d-4038c8299e8f
+# ╠═f2df6800-9d77-4eb4-bbca-e3244e7b4704
 # ╟─f5faa6af-9bb2-41ec-9517-579fc41db3e2
 # ╠═53a2dc51-6684-468d-b95a-6fea0937269e
 # ╠═e57e4592-4e66-45ca-b0ad-7fd32e1bdd5d
@@ -614,38 +716,42 @@ html"""
 # ╠═dfd329dd-c1a7-4e75-8f74-84a554af4f2c
 # ╟─2bb46928-5731-4a50-be2c-c20c5c243fe0
 # ╠═468bfd51-7eb3-48a2-b9a0-0c14749d3546
-# ╠═7e27197b-5846-4929-aad1-906fcec388be
-# ╠═ee98c760-e894-4b6a-9128-7838966bb838
-# ╠═3528e9f7-75b6-4e7b-9937-de7dbdcf1bc9
-# ╠═1e43a2e2-ebc9-4db2-8978-01bee664a02a
-# ╠═f69cf5df-49b9-495a-b769-d283aea4e29a
 # ╟─d90de796-b4a9-4d0f-85e1-de467e1f486a
+# ╟─cd10dda6-fc70-48a1-9e3d-c4f68407f628
+# ╠═fe0b3413-098a-48b2-b280-041f27e1d69c
+# ╠═19ba6e3e-8b9c-48ae-8daa-36d5f8aa3e0b
 # ╟─a76d38f4-e226-4a63-a2a8-8fbd78f760d2
-# ╠═b649d62d-5c3c-432a-9b88-286698ad3a54
 # ╠═979f80ee-8b89-4968-a9f8-b7fb64d1ed69
 # ╠═870e31eb-50e4-4c09-a596-f7c4033ef0f3
 # ╠═2852e29e-1e26-4d9c-9ab5-850910c0af32
 # ╠═bcb71114-b6aa-413b-a407-0bf9c6581611
 # ╠═e9177290-a364-427f-b4cf-7252baa4fd1e
-# ╠═9b4db41e-b506-421b-916a-8791be13d275
+# ╠═b649d62d-5c3c-432a-9b88-286698ad3a54
+# ╠═b8d942cb-76a0-419e-b883-f7a5a7762a8c
 # ╟─ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
+# ╠═4c35cb02-c2f4-43e5-8412-f80aed6142a1
+# ╠═c8b81ba0-0f95-472c-8b32-735a03041777
+# ╠═b7a5e97a-4704-43b3-bb9c-f12f477339bc
+# ╠═ddcdc2b3-f368-446a-b866-5e0dadd87f41
+# ╠═3da741ce-f54f-4be7-b0e7-30df31814656
+# ╠═bd1e3181-45be-451c-b5b3-cac2295a371a
+# ╠═264bbea2-2b3e-458b-b9fa-60146a0fb322
+# ╟─e0bcca99-d966-405f-9900-51f95c3ec6bd
+# ╠═be80a489-8b3a-467d-8a3b-27633057815d
 # ╠═036ad3b0-29a5-4f1a-bc67-e074868077c4
+# ╟─14050c73-5005-461f-91a6-4703c1ee2b67
+# ╠═bd76575f-57f6-465b-a1c4-d94ac0ff7113
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 # ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
 # ╠═db122fd6-b0c9-4e60-b3c0-6b990e9e3619
 # ╠═6a9a44c6-83e0-4756-941b-7e271756d4f3
+# ╟─aa0d1c5a-81f3-4707-9616-50d5fe8e37e2
+# ╠═9440d5f5-4939-4cb1-833a-cb39ad066091
 # ╟─15c527af-a483-4bfa-95e0-374b0dbbd22f
 # ╠═535dc5ec-506a-4afe-9d44-7657deb852f8
 # ╠═b1d5ef17-7a3e-4a8e-8387-a04d75018fa0
 # ╠═404da5d5-737d-4df9-b3e1-6fac3038eb5c
-# ╠═a65842cc-3ca2-40c6-a4f5-b7953648da16
-# ╠═bead3803-4652-48de-8e05-74f608e01fb4
-# ╠═94db42d3-3b2f-46d1-9d91-50f2a57b701b
-# ╠═26f53057-722c-484f-a932-e964ab0f2404
-# ╠═704e5aad-913e-45fa-ba27-3ced3458c81c
-# ╠═be80a489-8b3a-467d-8a3b-27633057815d
 # ╠═7d7f969f-f2fa-4bd4-91ce-50d404f8ff2b
-# ╠═7c1fefaa-33a4-409e-8fc5-4d3aa9b3eb1d
 # ╠═02105c89-d058-4cea-ae12-0481eacb6fdc
 # ╠═04289d7b-d973-4a5c-82d0-3ee8a596e26a
 # ╠═76701429-c0dd-454e-98fd-4e27a097898b
@@ -654,3 +760,4 @@ html"""
 # ╠═8f2e628f-14d3-4fe1-941d-d6c99caa7679
 # ╠═bb96f896-48e0-4d38-8ea2-85378ea4c6cc
 # ╠═f4adc5b8-6dfd-45d1-afd9-f5002f134b0b
+# ╠═3b56dfe1-ba2a-421f-8a1d-fb7e3667a814
