@@ -15,6 +15,8 @@ import HCubature: hcubature
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
 
+export insertsorted!
+
 export PMLGeometry
 export PMLCoordinates
 export CartesianCoordinates
@@ -65,8 +67,12 @@ export interpolate,
        ∂tν_∂ν,
        refine!,
        refine_in_ζ!,
+       refine,
        evaluate,
        evalute_and_correct
+export continue_in_ζ
+export Rip
+export eval_hermite_patch
 
 export Rip2D, classify_outer_boundary, find_rips
 
