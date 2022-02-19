@@ -116,9 +116,6 @@ Then we perform the same procedure recursively between both initial approximatio
 If the difference persists, we stop recursively subdividing when the difference in ζ is less than some previously defined δ.
 """
 
-# ╔═╡ f2df6800-9d77-4eb4-bbca-e3244e7b4704
-intrp_old = interpolate(u, pml, -τ/8:τ/32:τ/8, 0.99999999)
-
 # ╔═╡ f5faa6af-9bb2-41ec-9517-579fc41db3e2
 md"### Plots of transformation"
 
@@ -675,8 +672,17 @@ html"""
 </style>
 """
 
-# ╔═╡ 3b56dfe1-ba2a-421f-8a1d-fb7e3667a814
-)
+# ╔═╡ 2fe8dddb-f1ea-44d6-9409-f25c33a1cc2e
+md"""
+- Clean up this doc a bit
+- Send to MH
+- Demonstrate we can find the rip
+- Demonstrate calculate points, derivatives and integrate functions on this
+- Demonstrate that the transformation transforms the field
+- Show that integration scheme works on manufactured solution
+- Look at implementing this in a FEM scheme
+- 
+"""
 
 # ╔═╡ Cell order:
 # ╟─2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
@@ -702,7 +708,6 @@ html"""
 # ╠═d893b9d4-08ac-4693-8016-e0b857c07dba
 # ╠═3014f1ba-3bce-43a2-bf84-e22d08aabd38
 # ╠═9ebd6543-be73-4e30-a45d-4038c8299e8f
-# ╠═f2df6800-9d77-4eb4-bbca-e3244e7b4704
 # ╟─f5faa6af-9bb2-41ec-9517-579fc41db3e2
 # ╠═53a2dc51-6684-468d-b95a-6fea0937269e
 # ╠═e57e4592-4e66-45ca-b0ad-7fd32e1bdd5d
@@ -754,4 +759,4 @@ html"""
 # ╠═8f2e628f-14d3-4fe1-941d-d6c99caa7679
 # ╠═bb96f896-48e0-4d38-8ea2-85378ea4c6cc
 # ╠═f4adc5b8-6dfd-45d1-afd9-f5002f134b0b
-# ╠═3b56dfe1-ba2a-421f-8a1d-fb7e3667a814
+# ╠═2fe8dddb-f1ea-44d6-9409-f25c33a1cc2e
