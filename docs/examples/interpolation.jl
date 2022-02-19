@@ -564,9 +564,6 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 			if abs(ζ₂ - ζ₁) < δ
 				rip = find_rip(u_pml, tν₁, tν₂)
 				rip_interp_point = InterpPoint(rip.ν, rip.tν, NaN+im*NaN, NaN+im*NaN)
-				
-				push!(intrp, tν₁)
-				
 				# Add line on rip, continued from below
 				tν_rip₋ = continue_in_ζ(u_pml, rip.ζ, tν₁)
 				insertsorted!(tν_rip₋.points, rip_interp_point; by=p->p.ν)
@@ -579,17 +576,13 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 				tν_rip₊ = continue_in_ζ(u_pml, rip.ζ, tν₂)
 				insertsorted!(tν_rip₊.points, rip_interp_point; by=p->p.ν)
 				push!(intrp, tν_rip₊)
-				if ζ₂ != last(ζs)
-					push!(intrp, tν₂)
-				end
 			else
 				# Recursively split domain into 2 regions (3 points with ends)
-				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ)
+				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ, tν₊=tν₂)
 			end
-		else
-			if ζ₂ != last(ζs)
-				push!(intrp, tν₂)
-			end
+		end
+		if ζ₂ != last(ζs)
+			push!(intrp, tν₂)
 		end
 		tν₁ = tν₂
 	end
@@ -611,6 +604,7 @@ function interpolation(u_pml::PMLFieldFunction, ζs::AbstractVector; kwargs...):
 
 	tν₊ = interpolation_line(u_pml, last(ζs))
 	adaptively_append!(intrp, u_pml, ζs; tν₊, kwargs...)
+	push!(intrp, tν₊)
 
 	return intrp
 
