@@ -155,9 +155,6 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             if !isnothing(∂tν_∂ν_vec) push!(∂tν_∂ν_vec, ∂tν_∂ν(field,U_field)) end
             if !isnothing(∂tν_∂ζ_vec) push!(∂tν_∂ζ_vec, ∂tν_∂ζ(field,U_field,ν)) end
 
-            # Reset stepsize, try to guess what will be a good size for the next step without going past our max
-            h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
-
             # Store current as the starting point for next step
             field_prev = field
             t_prev  = t
