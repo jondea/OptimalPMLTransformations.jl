@@ -163,6 +163,15 @@ function eachpatch(line0::InterpLine, line1::InterpLine)
 	InterpPatchIterator(line0, line1)
 end
 
+# ╔═╡ bf5c5c99-fc52-46ad-9c88-e7515afa8f6c
+Base.IteratorSize(::InterpPatchIterator) = Base.SizeUnknown()
+
+# ╔═╡ 3a3141a4-8f93-4140-9ec8-a54af3d7781e
+Base.IteratorEltype(::InterpPatchIterator) = Base.HasEltype()
+
+# ╔═╡ c9028bfa-5e37-426e-9346-14e9a0c981db
+Base.eltype(::InterpPatchIterator) = InterpPatch
+
 # ╔═╡ bcb71114-b6aa-413b-a407-0bf9c6581611
 function Base.iterate(it::InterpPatchIterator, state)
 
@@ -204,8 +213,22 @@ function Base.iterate(it::InterpPatchIterator)
 	Base.iterate(it, (;intrp_points0, intrp_points1, intrp00, intrp01))
 end
 
-# ╔═╡ b8d942cb-76a0-419e-b883-f7a5a7762a8c
-# Plot simpler example with a few patches
+# ╔═╡ 2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
+simple_patches_intrp = let
+	# To demonstrate patches, we just need to set ν
+	p(ν) = InterpPoint(ν, 0, 0, 0)
+	
+	intrp = Interpolation([],[])
+	push!(intrp.continuous_region, ContinuousInterpolation(0.0, 0.3, []))
+	push!(intrp, InterpLine(0.0, [p(0), p(0.3), p(1.0)]))
+	push!(intrp, InterpLine(0.1, [p(0), p(0.7), p(1.0)]))
+	push!(intrp, InterpLine(0.3, [p(0), p(0.2), p(1.0)]))
+	push!(intrp, InterpLine(0.4, [p(0), p(0.3), p(0.5), p(1.0)]))
+	intrp
+end
+
+# ╔═╡ 9a3cff32-668f-4461-a851-d3470d7d3008
+md"""### Plot patch functions"""
 
 # ╔═╡ ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
 md"## Integration using interpolation"
@@ -391,6 +414,43 @@ integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, 
 
 # ╔═╡ 02105c89-d058-4cea-ae12-0481eacb6fdc
 consecutive_pairs(r) = partition(r, 2, 1)
+
+# ╔═╡ 40e74bff-e611-4665-994f-d366066b30ea
+function plot_patches!(lines::Vector{InterpLine})
+	plot!(xlabel="ζ", ylabel="ν")
+	for line in lines
+		plot!(fill(line.ζ, length(line.points)), [p.ν for p in line.points],
+			marker=true, label="Line knots")
+	end
+	
+	for (line1, line2) in consecutive_pairs(lines)
+		lastpatch = zero(InterpPatch)
+		for patch in eachpatch(line1, line2)
+			plot!([line1.ζ,line2.ζ],[patch.p00.ν, patch.p00.ν], label="Patch ν")
+			lastpatch = patch
+		end
+		plot!([line1.ζ,line2.ζ],[lastpatch.p11.ν, lastpatch.p11.ν], label="Patch ν")
+	end
+	plot!()
+end
+
+# ╔═╡ 65c0e3df-7a34-40c9-917a-87f177f9c685
+function plot_patches(intrp::Interpolation)
+	plot(xlabel="ζ", ylabel="ν")
+	for region in intrp.continuous_region
+		plot_patches!(region.lines)
+	end
+	plot!()
+end
+
+# ╔═╡ 91846642-de60-4884-8b9c-0bc9b8b9da3c
+function plot_patches(lines::Vector{InterpLine})
+	plot()
+	plot_patches!(lines)
+end
+
+# ╔═╡ 554a316a-8a82-4c2a-9dd9-5e25a6d7548e
+plot_patches(simple_patches_intrp)
 
 # ╔═╡ c8b81ba0-0f95-472c-8b32-735a03041777
 function integrate(intrp::Interpolation, integrand::Function;
@@ -619,21 +679,8 @@ let
 	patches
 end
 
-# ╔═╡ b649d62d-5c3c-432a-9b88-286698ad3a54
-let
-	plot(xlabel="ζ", ylabel="ν")
-	line1 = intrp.continuous_region[1].lines[end-1]
-	line2 = intrp.continuous_region[1].lines[end]
-	patches = InterpPatch[]
-	for patch in eachpatch(line1, line2)
-		push!(patches, patch)
-	end
-	
-	plot!(fill(line1.ζ, length(line1.points)), [p.ν for p in line1.points], marker=true, label="Line 2 knots")
-	plot!(fill(line2.ζ, length(line2.points)), [p.ν for p in line2.points], marker=true,
-		label="Line 1 knots")
-	hline!([patch.p00.ν for patch in patches], label="Patch ν")
-end
+# ╔═╡ bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
+plot_patches([intrp.continuous_region[1].lines[end-4], intrp.continuous_region[1].lines[end-3]])
 
 # ╔═╡ b7a5e97a-4704-43b3-bb9c-f12f477339bc
 integrate(intrp, integrand)
@@ -722,11 +769,19 @@ md"""
 # ╟─a76d38f4-e226-4a63-a2a8-8fbd78f760d2
 # ╠═979f80ee-8b89-4968-a9f8-b7fb64d1ed69
 # ╠═870e31eb-50e4-4c09-a596-f7c4033ef0f3
+# ╠═bf5c5c99-fc52-46ad-9c88-e7515afa8f6c
+# ╠═3a3141a4-8f93-4140-9ec8-a54af3d7781e
+# ╠═c9028bfa-5e37-426e-9346-14e9a0c981db
 # ╠═2852e29e-1e26-4d9c-9ab5-850910c0af32
 # ╠═bcb71114-b6aa-413b-a407-0bf9c6581611
 # ╠═e9177290-a364-427f-b4cf-7252baa4fd1e
-# ╠═b649d62d-5c3c-432a-9b88-286698ad3a54
-# ╠═b8d942cb-76a0-419e-b883-f7a5a7762a8c
+# ╠═2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
+# ╠═554a316a-8a82-4c2a-9dd9-5e25a6d7548e
+# ╠═bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
+# ╟─9a3cff32-668f-4461-a851-d3470d7d3008
+# ╠═65c0e3df-7a34-40c9-917a-87f177f9c685
+# ╠═91846642-de60-4884-8b9c-0bc9b8b9da3c
+# ╠═40e74bff-e611-4665-994f-d366066b30ea
 # ╟─ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
 # ╠═4c35cb02-c2f4-43e5-8412-f80aed6142a1
 # ╠═c8b81ba0-0f95-472c-8b32-735a03041777

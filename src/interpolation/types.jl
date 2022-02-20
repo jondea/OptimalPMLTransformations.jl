@@ -26,6 +26,9 @@ struct InterpPatch
     ζ1::Float64
 end
 
+import Base.zero
+zero(::Type{InterpPatch}) = InterpPatch(zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), 0, 0)
+
 function InterpLine(ζ::Float64, ν_vec::Vector{Float64}, tν_vec::Vector{ComplexF64}, ∂tν_∂ν_vec::Vector{ComplexF64}, ∂tν_∂ζ_vec::Vector{ComplexF64})
     InterpLine(ζ, [InterpPoint(t...) for t in zip(ν_vec,tν_vec,∂tν_∂ν_vec,∂tν_∂ζ_vec)])
 end
