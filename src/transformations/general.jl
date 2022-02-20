@@ -117,6 +117,12 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         # Step in ν
         ν = ν_prev + h
 
+        # If we are so close that the next step will be too small, just go right to ν_max
+        if abs(ν - ν_max) < h_min
+            ν = ν_max
+            h = ν  - ν_prev
+        end
+
         # Stepsize is too small, give up (unless this is the last step)
         if h < h_min && ν != ν_max
             if silent_failure

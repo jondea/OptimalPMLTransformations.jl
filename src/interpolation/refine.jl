@@ -21,7 +21,7 @@ function refine!(intrp::Interpolation,  u::AbstractFieldFunction, pml::PMLGeomet
     intrp
 end
 
-function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
+function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry; δ=1e-12)
 
     ζ = line.ζ
 
@@ -36,12 +36,15 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
     while !isempty(points)
         next_point = peek(points)
 
-        ν = (prev_point.ν + next_point.ν)/2
-        tν0 = eval_hermite_patch(prev_point, next_point, ν).tν
+        # Guard against steps which are too small
+        if abs(prev_point.ν - next_point.ν) < δ
+            ν = (prev_point.ν + next_point.ν)/2
+            tν0 = eval_hermite_patch(prev_point, next_point, ν).tν
 
-        tν, field, converged = corrector(field_fnc, U, ν, tν0; N_iter_max=10, householder_order=3)
-        if !converged error() end
-        push!(extra_points, InterpPoint(ν, tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field, ν)))
+            tν, field, converged = corrector(field_fnc, U, ν, tν0; N_iter_max=10, householder_order=3)
+            if !converged error() end
+            push!(extra_points, InterpPoint(ν, tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field, ν)))
+        end
         prev_point = popfirst!(points)
     end
 
@@ -50,7 +53,7 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry)
     sort!(line.points, by=p->p.ν)
 end
 
-function refine_in_ζ!(region::ContinuousInterpolation, u::AbstractFieldFunction, pml::PMLGeometry)
+function refine_in_ζ!(region::ContinuousInterpolation, u::AbstractFieldFunction, pml::PMLGeometry; δ=1e-12)
     ν_max = last(first(region.lines).points).ν
 
     function create_line(ζ)
@@ -69,8 +72,11 @@ function refine_in_ζ!(region::ContinuousInterpolation, u::AbstractFieldFunction
 
     while !isempty(lines)
         next_line = peek(lines)
-        ζ = (prev_line.ζ + next_line.ζ)/2
-        push!(extra_lines, create_line(ζ))
+        # Guard against steps which are too small
+        if abs(prev_line.ζ - next_line.ζ) > δ
+            ζ = (prev_line.ζ + next_line.ζ)/2
+            push!(extra_lines, create_line(ζ))
+        end
         prev_line = popfirst!(lines)
     end
 
