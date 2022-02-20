@@ -178,7 +178,7 @@ function Base.iterate(it::InterpPatchIterator, state)
 	if isempty(state.intrp_points0) || isempty(state.intrp_points1)
 		return nothing
 	end
-	
+
 	# If one is smaller than the other, use the point with the smallest ν,
 	# popping it to show it has been used. Interpolate by peeking forward for the other
 	if peek(state.intrp_points0).ν > peek(state.intrp_points1).ν
@@ -193,7 +193,7 @@ function Base.iterate(it::InterpPatchIterator, state)
 	end
 
 	patch = InterpPatch(state.intrp00, state.intrp01, intrp10, intrp11, it.intrp0.ζ, it.intrp1.ζ)
-		
+
 	(patch, (;state.intrp_points0, state.intrp_points1, intrp00=intrp10, intrp01=intrp11))
 end
 
@@ -217,7 +217,7 @@ end
 simple_patches_intrp = let
 	# To demonstrate patches, we just need to set ν
 	p(ν) = InterpPoint(ν, 0, 0, 0)
-	
+
 	intrp = Interpolation([],[])
 	push!(intrp.continuous_region, ContinuousInterpolation(0.0, 0.3, []))
 	push!(intrp, InterpLine(0.0, [p(0), p(0.3), p(1.0)]))
@@ -254,9 +254,6 @@ function integrate(patch::InterpPatch, integrand::Function;
 	end
 	integral
 end
-
-# ╔═╡ bd1e3181-45be-451c-b5b3-cac2295a371a
-
 
 # ╔═╡ 264bbea2-2b3e-458b-b9fa-60146a0fb322
 # Adaptive?
@@ -384,18 +381,16 @@ begin
 	Use the InterpPatch as an initial guess, then solve to find the optimal pml transformation
 	"""
 	struct ExactPatch{PMLFF <: PMLFieldFunction}
-		ζ0::Float64
-		ζ1::Float64
 		patch::InterpPatch
 		u_pml::PMLFF
 	end
-	(ep::ExactPatch)(ν::Number, ζ::Number) = evalute_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ep.ζ0, ep.ζ1, ν, ζ)
+	(ep::ExactPatch)(ν::Number, ζ::Number) = evalute_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ν, ζ)
 	(ep::ExactPatch)(νζ::AbstractVector) = ep(νζ[1], νζ[2])
 end
 
 # ╔═╡ 036ad3b0-29a5-4f1a-bc67-e074868077c4
-function hcubature(patch::ExactPatch, integrand; kwargs...)
-	I, E = hcubature(integrand ∘ patch, SA[patch.patch.interp11.ν, patch.ζ0], SA[patch.patch.interp00.ν, patch.ζ1]; kwargs...)
+function HCubature.hcubature(ep::ExactPatch, integrand; kwargs...)
+	I, E = hcubature(integrand ∘ ep, SA[ep.patch.p11.ν, ep.patch.ζ0], SA[ep.patch.p00.ν, ep.patch.ζ1]; kwargs...)
 end
 
 # ╔═╡ 535dc5ec-506a-4afe-9d44-7657deb852f8
@@ -422,7 +417,7 @@ function plot_patches!(lines::Vector{InterpLine})
 		plot!(fill(line.ζ, length(line.points)), [p.ν for p in line.points],
 			marker=true, label="Line knots")
 	end
-	
+
 	for (line1, line2) in consecutive_pairs(lines)
 		lastpatch = zero(InterpPatch)
 		for patch in eachpatch(line1, line2)
@@ -460,6 +455,20 @@ function integrate(intrp::Interpolation, integrand::Function;
 		for (line1, line2) in consecutive_pairs(region.lines)
 			for patch in eachpatch(line1, line2)
 				integral += integrate(patch, integrand; gauss_order, knots_and_weights)
+			end
+		end
+	end
+	integral
+end
+
+# ╔═╡ 1b128f4d-d10e-4018-9b3d-a85b19eefc34
+function HCubature.hcubature(intrp::Interpolation, u_pml::PMLFieldFunction,integrand::Function; kwargs...)
+	integral = zero(integrand(zero(InterpPoint)))
+	for region in intrp.continuous_region
+		for (line1, line2) in consecutive_pairs(region.lines)
+			for patch in eachpatch(line1, line2)
+				I,E = hcubature(ExactPatch(patch, u_pml), integrand; kwargs...)
+				integral += I
 			end
 		end
 	end
@@ -574,10 +583,10 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 	ζ_crit = only(rips).ζ
 
 	ζ_width = ζ_range[2]-ζ_range[1]
-	
+
 	# Find singularity
 	s_crit = ((ζ_crit - ζ_range[1])/ζ_width, ν_crit)
-	
+
 	# Get Gauss-Legendre knot points and weights, and transform to [0,1]
 	nodes, weights = gausslegendre(integration_order)
 	nodes .= (nodes .+ 1)/2
@@ -602,7 +611,7 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 			ν = trans_node[2]
 			tν, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field = optimal_pml_transformation_solve(field_fnc_ν, ν; 					ν0=ν_prev, tν0=tν_prev, field0=field, U_field=U_field, householder_order=3)
 			integral += trans_weight*integrand(ν, ∂tν_∂ν)*ζ_width
-			
+
 			n_knot += 1
 			ν_prev = ν
 			tν_prev = tν
@@ -628,7 +637,7 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 
 				# Adding a rip severs the two domains
 				push!(intrp, Rip(rip.ζ))
-				
+
 				# Add line on rip, continued from above
 				tν_rip₊ = continue_in_ζ(u_pml, rip.ζ, tν₂)
 				insertsorted!(tν_rip₊.points, rip_interp_point; by=p->p.ν)
@@ -682,14 +691,23 @@ end
 # ╔═╡ bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
 plot_patches([intrp.continuous_region[1].lines[end-4], intrp.continuous_region[1].lines[end-3]])
 
-# ╔═╡ b7a5e97a-4704-43b3-bb9c-f12f477339bc
+# ╔═╡ ad1a72d9-d014-4801-afb1-1c93bfd9f27f
+intrp_refine1 = refine(intrp, u, pml, 1)
+
+# ╔═╡ 817a21f9-8241-4834-a5df-d04dae1529bb
 integrate(intrp, integrand)
 
-# ╔═╡ ddcdc2b3-f368-446a-b866-5e0dadd87f41
+# ╔═╡ 1cfd7e14-20b7-492e-802d-bb75e6706f42
 integrate(refine(intrp, u, pml, 1), integrand)
+
+# ╔═╡ ddcdc2b3-f368-446a-b866-5e0dadd87f41
+integrate(refine(intrp, u, pml, 2), integrand)
 
 # ╔═╡ 3da741ce-f54f-4be7-b0e7-30df31814656
 integrate(refine(intrp, u, pml, 3), integrand)
+
+# ╔═╡ 82980cc9-ecd4-4335-8f62-72c95ffa670f
+hcubature(intrp, u_pml, integrand; atol=1e-1, rtol=1e-1)
 
 # ╔═╡ 46ae12d1-593c-4eef-a324-ae53f3192896
 function relative_max_difference(line1::InterpLine, line2::InterpLine)
@@ -728,7 +746,7 @@ md"""
 - Demonstrate that the transformation transforms the field
 - Show that integration scheme works on manufactured solution
 - Look at implementing this in a FEM scheme
-- 
+-
 """
 
 # ╔═╡ Cell order:
@@ -785,14 +803,17 @@ md"""
 # ╟─ab5883f5-674b-4acf-a4c9-9cf4f7dc90ba
 # ╠═4c35cb02-c2f4-43e5-8412-f80aed6142a1
 # ╠═c8b81ba0-0f95-472c-8b32-735a03041777
-# ╠═b7a5e97a-4704-43b3-bb9c-f12f477339bc
+# ╠═ad1a72d9-d014-4801-afb1-1c93bfd9f27f
+# ╠═817a21f9-8241-4834-a5df-d04dae1529bb
+# ╠═1cfd7e14-20b7-492e-802d-bb75e6706f42
 # ╠═ddcdc2b3-f368-446a-b866-5e0dadd87f41
 # ╠═3da741ce-f54f-4be7-b0e7-30df31814656
-# ╠═bd1e3181-45be-451c-b5b3-cac2295a371a
 # ╠═264bbea2-2b3e-458b-b9fa-60146a0fb322
 # ╟─e0bcca99-d966-405f-9900-51f95c3ec6bd
 # ╠═be80a489-8b3a-467d-8a3b-27633057815d
 # ╠═036ad3b0-29a5-4f1a-bc67-e074868077c4
+# ╠═1b128f4d-d10e-4018-9b3d-a85b19eefc34
+# ╠═82980cc9-ecd4-4335-8f62-72c95ffa670f
 # ╟─14050c73-5005-461f-91a6-4703c1ee2b67
 # ╠═bd76575f-57f6-465b-a1c4-d94ac0ff7113
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
