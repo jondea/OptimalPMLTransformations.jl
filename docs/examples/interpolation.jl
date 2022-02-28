@@ -23,8 +23,8 @@ begin
 	plotlyjs()
 end
 
-# ╔═╡ db122fd6-b0c9-4e60-b3c0-6b990e9e3619
-@revise using OptimalPMLTransformations
+# ╔═╡ 0d0605ef-0593-45a6-a856-96d8a98f451b
+ using OptimalPMLTransformations
 
 # ╔═╡ 2dcb0cb8-0d06-4d55-9bf9-ed27b5c5bc7e
 md"# Adaptive interpolation and integration of optimal PML transformation"
@@ -34,7 +34,7 @@ md"""
 ## Prerequisites
 
 - We can calculate the optimal transformation with numerical continuation and Newton like root finding
-- We can find rips, and we know their local behaviour
+- We know the local behaviour of rips
 """
 
 # ╔═╡ e84ff3cc-818a-4b0d-a882-fc5850ba96be
@@ -74,18 +74,24 @@ u = let
 	HankelSeries(k, a)
 end
 
+# ╔═╡ 1727cb58-2b5d-4fe1-89a4-fb35a75f2e2d
+md"""
+We combine the PML geometry and field into a single data structure for convenience.
+Together they define the optimal PML transformation.
+"""
+
 # ╔═╡ d8c6957a-8cbd-422b-b77c-4f842b7238d2
 md"""
 ## Approximation through the PML
 
-When calculating the transformation at a point within the PML (ν, θ), we take small steps from the inner PML boundary (because there we know that u=U).
-As we step along, we try to ensure continuity.
-So when the transformation changes rapidly, or the corrector does not converge, we reduce the step size.
-The points along the way naturally give us adaptive knot points for our interpolation.
-We use the adaptivity of the solver to refine the approximation when the transformation changes rapidly.
+When calculating the transformation at a point within the PML (ν, θ), we take small steps from the inner PML boundary (because there we know that tν=R).
+As we step along, we ensure continuity numerically.
+When the transformation changes rapidly, or the corrector does not converge, we reduce the step size.
+The points along the way naturally give us adaptive knot points for an interpolation.
+In short, we use the adaptivity of the numerical continuation to refine the approximation when the transformation changes rapidly.
 
-We could linearly interpolate between these knot points, but we can do a bit better.
-When we evaluate the transformation at a point, we get the derivatives (in ν and θ) for free (relatively speaking).
+To get the transformation between knot points, we could linearly interpolate between them, but we can do a bit better.
+When we evaluate the transformation at a point, we get the derivatives (in ν and θ) for free (relatively speaking in terms of computational cost).
 So we use these at each point to construct a cubic Hermite interpolation.
 
 The plot below shows the points where the transformation has been evaluated, the solid line is the cubic Hermite interpolation, and the dashed line is a piecewise linear interpolation.
@@ -106,11 +112,11 @@ md"""
 ## Approximation through and across the PML
 
 We have a way to approximate the transformation through the PML (ν), how do we build an approximation through *and* across the PML (ν,θ)?
+Recall that to find rips, we subdivided across the PML in areas where the transformation changed rapidly.
+We use an almost identical approach to form the approximation, but instead of building up a vector of rips, we are creating an adaptive appromixation.
+Refining where the transformation changes rapidly finds both rips and adds more ζ knots where the transformation changes rapidly.
 
-
-
-
-To approximate the transformation across the PML, we start with several approximations through the PML.
+Specifically, to approximate the transformation across the PML, we start with several approximations through the PML.
 We then compare these approximations through the PML, and if the maximum relative difference between them is too large, we find the approximation between the two.
 Then we perform the same procedure recursively between both initial approximations and the middle one.
 If the difference persists, we stop recursively subdividing when the difference in ζ is less than some previously defined δ.
@@ -143,6 +149,9 @@ md"""
 # ╔═╡ cd10dda6-fc70-48a1-9e3d-c4f68407f628
 md"## Integrand"
 
+# ╔═╡ 5e7b9106-f7c0-4466-bc39-8ef1fd62b13c
+md"We need to be able to integrate the weak form of the FEM, this is the integrand."
+
 # ╔═╡ fe0b3413-098a-48b2-b280-041f27e1d69c
 integrand(ν::Number, ∂tν_∂ν::Number) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂tν_∂ν
 
@@ -150,7 +159,28 @@ integrand(ν::Number, ∂tν_∂ν::Number) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂t
 integrand(p::InterpPoint) = integrand(p.ν, p.∂tν_∂ν)
 
 # ╔═╡ a76d38f4-e226-4a63-a2a8-8fbd78f760d2
-md"## Patches"
+md"""
+## Patches
+
+We have a sequence of interpolation lines, but to integrate, we must split this into small patches.
+The first issue is that the knot points in ν for consecutives lines in ζ do not necessarily line up.
+We therefore create patches as shown below.
+The function used to iterate over patches between two consecutive interpolation lines is called `eachpatch`.
+"""
+
+# ╔═╡ 2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
+simple_patches_intrp = let
+	# To demonstrate patches, we just need to set ν
+	p(ν) = InterpPoint(ν, 0, 0, 0)
+
+	intrp = Interpolation([],[])
+	push!(intrp.continuous_region, ContinuousInterpolation(0.0, 0.3, []))
+	push!(intrp, InterpLine(0.0, [p(0), p(0.3), p(1.0)]))
+	push!(intrp, InterpLine(0.1, [p(0), p(0.7), p(1.0)]))
+	push!(intrp, InterpLine(0.3, [p(0), p(0.2), p(1.0)]))
+	push!(intrp, InterpLine(0.4, [p(0), p(0.3), p(0.5), p(1.0)]))
+	intrp
+end
 
 # ╔═╡ 870e31eb-50e4-4c09-a596-f7c4033ef0f3
 struct InterpPatchIterator
@@ -213,20 +243,6 @@ function Base.iterate(it::InterpPatchIterator)
 	Base.iterate(it, (;intrp_points0, intrp_points1, intrp00, intrp01))
 end
 
-# ╔═╡ 2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
-simple_patches_intrp = let
-	# To demonstrate patches, we just need to set ν
-	p(ν) = InterpPoint(ν, 0, 0, 0)
-
-	intrp = Interpolation([],[])
-	push!(intrp.continuous_region, ContinuousInterpolation(0.0, 0.3, []))
-	push!(intrp, InterpLine(0.0, [p(0), p(0.3), p(1.0)]))
-	push!(intrp, InterpLine(0.1, [p(0), p(0.7), p(1.0)]))
-	push!(intrp, InterpLine(0.3, [p(0), p(0.2), p(1.0)]))
-	push!(intrp, InterpLine(0.4, [p(0), p(0.3), p(0.5), p(1.0)]))
-	intrp
-end
-
 # ╔═╡ 9a3cff32-668f-4461-a851-d3470d7d3008
 md"""### Plot patch functions"""
 
@@ -256,7 +272,7 @@ function integrate(patch::InterpPatch, integrand::Function;
 end
 
 # ╔═╡ 264bbea2-2b3e-458b-b9fa-60146a0fb322
-# Adaptive?
+# Adaptive refinement using error measure from integral?
 
 # ╔═╡ e0bcca99-d966-405f-9900-51f95c3ec6bd
 md"## Integration using adaptive quadrature (Genz-Malik)"
@@ -268,6 +284,9 @@ md"## Integration using transformed Gaussian quadrature"
 md"""
 # Appendix
 """
+
+# ╔═╡ db122fd6-b0c9-4e60-b3c0-6b990e9e3619
+# @revise using OptimalPMLTransformations
 
 # ╔═╡ 6a9a44c6-83e0-4756-941b-7e271756d4f3
 function interpolate_and_plot(u::AbstractFieldFunction, pml::PMLGeometry, seriestype::Symbol, νs::AbstractVector, ζs; f=(l,ν)->l(ν), kwargs...)
@@ -330,17 +349,17 @@ end
 u_pml = PMLFieldFunction(u, pml)
 
 # ╔═╡ ec66435f-aeb2-472e-91f4-d510d801cdf0
-# "Use Newton's method to find a single rip from an initial guess"
+"Use Newton's method to find a single rip from an initial guess"
 function find_rip(u_pml::PMLFieldFunction, ν::Real, ζ::Real, tν::Number; ε=1e-12)
 
     x = SA[ν, ζ, real(tν), imag(tν)]
 
-	U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0+0.0im, ζ)
+	U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0 + 0.0im, ζ)
 	(;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ) = u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}, tν, ζ)
 
     # Create vector of residuals
-	o_rip = ∂u_∂tν
-	o_opt = u - U*(1-ν)
+	o_rip = ∂u_∂tν # ∂u_∂tν == 0 implies rip
+	o_opt = u - U*(1-ν) # Ensures that tν stays on the optimal transformation
     r = SA[real(o_rip), imag(o_rip), real(o_opt), imag(o_opt)]
 
     n_iter = 1
@@ -363,7 +382,7 @@ function find_rip(u_pml::PMLFieldFunction, ν::Real, ζ::Real, tν::Number; ε=1
         tν = x[3] + im*x[4]
 
 		# Recompute field and residual at new point
-		U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0, ζ)
+		U, ∂U_∂tζ = u_pml(NamedTuple{(:u, :∂u_∂tζ)}, 0.0 + 0.0im, ζ)
 		u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ= u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}, tν, ζ)
 
 		o_rip = ∂u_∂tν
@@ -489,9 +508,9 @@ begin
 end
 
 # ╔═╡ 4ca27bec-49df-4eb5-b60c-5d7bbfb56c75
-# "Use Newton's method to find a single rip somewhere between two lines"
+"Use Newton's method to find a single rip somewhere between two lines"
 function find_rip(u_pml::PMLFieldFunction, tν₋::InterpLine, tν₊::InterpLine)
-	# Find mostly likely point for rip along the two lines to use as an initial guess
+	# Find mostly likely point for rip along the two lines, which we will then use as an initial guess
 	p₋ = argmax(p->abs((1-p.ν)*p.∂tν_∂ν), tν₋.points)
 	p₊ = argmax(p->abs((1-p.ν)*p.∂tν_∂ν), tν₊.points)
 	ζ₋ = tν₋.ζ
@@ -520,7 +539,13 @@ function relative_l2_difference(line1::InterpLine, line2::InterpLine)
 end
 
 # ╔═╡ a74672a6-008a-43bc-b07e-1581064f3d02
-"Find all rips of size >ε between ζs, by recursively subdividing"
+"""
+Find all rips of size >ε between ζs, by recursively subdividing until difference between ζs is <δ.
+
+Size of rip is defined by the function tν_metric, which finds the distance between two interpolations.
+If a rip persists and the difference between ζs is <δ we use Newtons method to find the rip accurately.
+We then push this onto our vector of rips.
+"""
 function find_rips!(rips::Vector{Rip2D}, u_pml::PMLFieldFunction, ζs::AbstractVector;
 	ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference,
 	tν₋ = interpolation_line(u_pml, first(ζs)), tν₊ = interpolation_line(u_pml, last(ζs)),)::Vector{Rip2D}
@@ -552,24 +577,25 @@ rips = find_rips(u_pml, range(0, τ, length=11))
 
 # ╔═╡ 429d80ae-7fcf-4240-a6f0-e955ba158b3b
 let
-	ν_vec = Float64[]
-	tν_vec = ComplexF64[]
-	∂tν_∂ν_vec = ComplexF64[]
-
 	ν_max = 0.999
 	θ = rips[2].ζ+0.001
-	optimal_pml_transformation_solve(u, pml, ν_max, θ, ν_vec, tν_vec, ∂tν_∂ν_vec)
-	intrp = CubicHermiteSplineInterpolation(ν_vec, tν_vec, ∂tν_∂ν_vec)
 
+	tν = interpolation_line(u_pml, θ; ν_max)
+
+	tν_vec = [p.tν for p in tν.points]
+	ν_vec = [p.ν for p in tν.points]
+	
 	ν_vec_plot = 0:0.001:ν_max
 	complex2cols(c) = [real.(c) imag.(c)]
 
-	colors=[:orange :blue]
+	colors = [:orange :blue]
 
 	plot(legend=false)
-	plot!(ν_vec, complex2cols(tν_vec), label=["real(linear approx)" "imag(linear approx)"], color=colors, linestyle=:dash)
-	plot!(ν_vec_plot, complex2cols(intrp.(ν_vec_plot)), label=["real(hermite approx)" "imag(hermite approx)"], color=colors)
-	scatter!(ν_vec, complex2cols(intrp.(ν_vec)), label=["real(knot)" "imag(knot)"], color=colors)
+	plot!(ν_vec, complex2cols(tν_vec), label=["real(linear approx)" "imag(linear approx)"],
+		color=colors, linestyle=:dash)
+	plot!(ν_vec_plot, complex2cols(tν.(ν_vec_plot)), label=["real(hermite approx)" "imag(hermite approx)"],
+		color=colors)
+	scatter!(ν_vec, complex2cols(tν_vec), label=["real(knot)" "imag(knot)"], color=colors)
 end
 
 # ╔═╡ bd76575f-57f6-465b-a1c4-d94ac0ff7113
@@ -621,21 +647,28 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 end
 
 # ╔═╡ 3014f1ba-3bce-43a2-bf84-e22d08aabd38
-function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector; ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference, tν₊=interpolation_line(u_pml, last(ζs)))::Interpolation
+"Adaptively append interpolation lines to the interpolation, between first(ζs) and last(ζs) (not including end points)"
+function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector;
+	ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference,
+	tν₊=interpolation_line(u_pml, last(ζs)))::Interpolation
 
 	tν₁ = last(last(intrp.continuous_region).lines)
 	for (ζ₁, ζ₂) in consecutive_pairs(ζs)
 		tν₂ = (ζ₂ == last(ζs)) ? tν₊ : interpolation_line(u_pml, ζ₂)
 		if tν_metric(tν₁,tν₂) > ε
 			if abs(ζ₂ - ζ₁) < δ
+				# Find rip point accurately using Newton's method
 				rip = find_rip(u_pml, tν₁, tν₂)
+
+				# Rip has unbounded derivatives in ν and ζ, add NaNs
 				rip_interp_point = InterpPoint(rip.ν, rip.tν, NaN+im*NaN, NaN+im*NaN)
+				
 				# Add line on rip, continued from below
 				tν_rip₋ = continue_in_ζ(u_pml, rip.ζ, tν₁)
 				insertsorted!(tν_rip₋.points, rip_interp_point; by=p->p.ν)
 				push!(intrp, tν_rip₋)
 
-				# Adding a rip severs the two domains
+				# Adding a rip severs the two continuous regions
 				push!(intrp, Rip(rip.ζ))
 
 				# Add line on rip, continued from above
@@ -647,6 +680,7 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ, tν₊=tν₂)
 			end
 		end
+		# Don't add interpolation on the last ζ, or we'd add duplicates all up the call stack
 		if ζ₂ != last(ζs)
 			push!(intrp, tν₂)
 		end
@@ -665,11 +699,15 @@ Add a rip if the division in ζ is <δ.
 """
 function interpolation(u_pml::PMLFieldFunction, ζs::AbstractVector; kwargs...)::Interpolation
 
+	# Start off interpolation with the first ζ
 	tν₋ = interpolation_line(u_pml, first(ζs))
 	intrp = Interpolation(tν₋)
 
+	# Compute the interpolation at the last point and pass in for efficiency
 	tν₊ = interpolation_line(u_pml, last(ζs))
 	adaptively_append!(intrp, u_pml, ζs; tν₊, kwargs...)
+
+	# Now we've done adaptively appending to the interpolation, add the final interpolation line
 	push!(intrp, tν₊)
 
 	return intrp
@@ -679,6 +717,9 @@ end
 # ╔═╡ 9ebd6543-be73-4e30-a45d-4038c8299e8f
 intrp = interpolation(u_pml, -τ/8:τ/32:τ/8)
 
+# ╔═╡ bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
+plot_patches([intrp.continuous_region[1].lines[end-4], intrp.continuous_region[1].lines[end-3]])
+
 # ╔═╡ e9177290-a364-427f-b4cf-7252baa4fd1e
 let
 	patches = InterpPatch[]
@@ -687,9 +728,6 @@ let
 	end
 	patches
 end
-
-# ╔═╡ bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
-plot_patches([intrp.continuous_region[1].lines[end-4], intrp.continuous_region[1].lines[end-3]])
 
 # ╔═╡ ad1a72d9-d014-4801-afb1-1c93bfd9f27f
 intrp_refine1 = refine(intrp, u, pml, 1)
@@ -759,6 +797,7 @@ md"""
 # ╠═80f13c88-aa00-4000-808b-b7ec35b3aa02
 # ╟─2a717cb2-82e1-4470-b871-9dea2bd70e2c
 # ╠═0d75f7cb-6503-412d-b4c7-76772d05ff33
+# ╟─1727cb58-2b5d-4fe1-89a4-fb35a75f2e2d
 # ╠═8e497f14-8f77-45b9-8843-bc65e20a61d5
 # ╟─d8c6957a-8cbd-422b-b77c-4f842b7238d2
 # ╠═429d80ae-7fcf-4240-a6f0-e955ba158b3b
@@ -782,9 +821,13 @@ md"""
 # ╠═468bfd51-7eb3-48a2-b9a0-0c14749d3546
 # ╟─d90de796-b4a9-4d0f-85e1-de467e1f486a
 # ╟─cd10dda6-fc70-48a1-9e3d-c4f68407f628
+# ╟─5e7b9106-f7c0-4466-bc39-8ef1fd62b13c
 # ╠═fe0b3413-098a-48b2-b280-041f27e1d69c
 # ╠═19ba6e3e-8b9c-48ae-8daa-36d5f8aa3e0b
 # ╟─a76d38f4-e226-4a63-a2a8-8fbd78f760d2
+# ╠═2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
+# ╠═554a316a-8a82-4c2a-9dd9-5e25a6d7548e
+# ╠═bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
 # ╠═979f80ee-8b89-4968-a9f8-b7fb64d1ed69
 # ╠═870e31eb-50e4-4c09-a596-f7c4033ef0f3
 # ╠═bf5c5c99-fc52-46ad-9c88-e7515afa8f6c
@@ -793,9 +836,6 @@ md"""
 # ╠═2852e29e-1e26-4d9c-9ab5-850910c0af32
 # ╠═bcb71114-b6aa-413b-a407-0bf9c6581611
 # ╠═e9177290-a364-427f-b4cf-7252baa4fd1e
-# ╠═2e37cd7c-2955-4efd-b8f2-e7a2e6b2934c
-# ╠═554a316a-8a82-4c2a-9dd9-5e25a6d7548e
-# ╠═bbe8cdb3-7b18-40c9-b94e-a9b0d4609b9f
 # ╟─9a3cff32-668f-4461-a851-d3470d7d3008
 # ╠═65c0e3df-7a34-40c9-917a-87f177f9c685
 # ╠═91846642-de60-4884-8b9c-0bc9b8b9da3c
@@ -819,6 +859,7 @@ md"""
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 # ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
 # ╠═db122fd6-b0c9-4e60-b3c0-6b990e9e3619
+# ╠═0d0605ef-0593-45a6-a856-96d8a98f451b
 # ╠═6a9a44c6-83e0-4756-941b-7e271756d4f3
 # ╟─aa0d1c5a-81f3-4707-9616-50d5fe8e37e2
 # ╠═9440d5f5-4939-4cb1-833a-cb39ad066091
