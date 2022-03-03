@@ -324,8 +324,8 @@ md"""
 """
 
 # ╔═╡ 9440d5f5-4939-4cb1-833a-cb39ad066091
-function hcubature(line1::InterpLine, line2::InterpLine; kwargs...)
-	mapreduce(patch->hcubature(patch, integrand; kwargs...)[1], +, eachpatch(line1, line2))
+function integrate_adaptive(line1::InterpLine, line2::InterpLine; kwargs...)
+	mapreduce(patch->integrate_adaptive(patch, integrand; kwargs...)[1], +, eachpatch(line1, line2))
 end
 
 # ╔═╡ 15c527af-a483-4bfa-95e0-374b0dbbd22f
@@ -408,7 +408,7 @@ begin
 end
 
 # ╔═╡ 036ad3b0-29a5-4f1a-bc67-e074868077c4
-function HCubature.hcubature(ep::ExactPatch, integrand; kwargs...)
+function integrate_adaptive(ep::ExactPatch, integrand; kwargs...)
 	I, E = hcubature(integrand ∘ ep, SA[ep.patch.p11.ν, ep.patch.ζ0], SA[ep.patch.p00.ν, ep.patch.ζ1]; kwargs...)
 end
 
@@ -481,12 +481,12 @@ function integrate(intrp::Interpolation, integrand::Function;
 end
 
 # ╔═╡ 1b128f4d-d10e-4018-9b3d-a85b19eefc34
-function HCubature.hcubature(intrp::Interpolation, u_pml::PMLFieldFunction,integrand::Function; kwargs...)
+function integrate_adaptive(intrp::Interpolation, u_pml::PMLFieldFunction,integrand::Function; kwargs...)
 	integral = zero(integrand(zero(InterpPoint)))
 	for region in intrp.continuous_region
 		for (line1, line2) in consecutive_pairs(region.lines)
 			for patch in eachpatch(line1, line2)
-				I,E = hcubature(ExactPatch(patch, u_pml), integrand; kwargs...)
+				I,E = integrate_adaptive(ExactPatch(patch, u_pml), integrand; kwargs...)
 				integral += I
 			end
 		end
@@ -599,11 +599,8 @@ let
 end
 
 # ╔═╡ bd76575f-57f6-465b-a1c4-d94ac0ff7113
-function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
-	field_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)},
-		PMLCoordinates(tν,ζ), pml)
-
-	rips = find_rips(field_fnc_νζ, ζ_range[1], ζ_range[2], Nζ=21, ν=0.999, ε=1e-3)
+function integrate_trans_gauss(u_pml, ν_range, ζ_range, integration_order)
+	rips = find_rips(u_pml, range(ζ_range..., length=5))
 
 	ν_crit = only(rips).ν
 	ζ_crit = only(rips).ζ
@@ -629,7 +626,7 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 		ν_prev = ν
 		tν = 0.0 + 0.0im
 		tν_prev = tν
-		field_fnc_ν(tν) = field_fnc_νζ(tν, ζ)
+		field_fnc_ν(tν) =  u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, tν, ζ)
 		U_field = field_fnc_ν(0.0+0.0im)
 		field = U_field
 		for _ in 1:2integration_order # Loop around ν
@@ -645,6 +642,15 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 	end
 	return integral
 end
+
+# ╔═╡ a0a37728-0e8f-400a-b8f7-2610bf9580ce
+tgauss_region1 = integrate_trans_gauss(u_pml, (0.0, 1.0), (-τ/8,0), 100)
+
+# ╔═╡ f4a19853-2bf9-4605-ab1d-69d1f522159c
+tgauss_region2 = integrate_trans_gauss(u_pml, (0.0, 1.0), (0,τ/8), 100)
+
+# ╔═╡ e6dae7b1-11a4-4c9e-bed3-536a29201d5d
+integral_tgauss = tgauss_region1 + tgauss_region2
 
 # ╔═╡ 3014f1ba-3bce-43a2-bf84-e22d08aabd38
 "Adaptively append interpolation lines to the interpolation, between first(ζs) and last(ζs) (not including end points)"
@@ -744,8 +750,11 @@ integrate(refine(intrp, u, pml, 2), integrand)
 # ╔═╡ 3da741ce-f54f-4be7-b0e7-30df31814656
 integrate(refine(intrp, u, pml, 3), integrand)
 
+# ╔═╡ 96d35722-e894-490b-a21d-20559fc6ac60
+integral_refined4 = integrate(refine(intrp, u, pml, 4), integrand)
+
 # ╔═╡ 82980cc9-ecd4-4335-8f62-72c95ffa670f
-hcubature(intrp, u_pml, integrand; atol=1e-1, rtol=1e-1)
+integral_adaptive = integrate_adaptive(intrp, u_pml, integrand; atol=1e-12, rtol=1e-12)
 
 # ╔═╡ 46ae12d1-593c-4eef-a324-ae53f3192896
 function relative_max_difference(line1::InterpLine, line2::InterpLine)
@@ -848,6 +857,7 @@ md"""
 # ╠═1cfd7e14-20b7-492e-802d-bb75e6706f42
 # ╠═ddcdc2b3-f368-446a-b866-5e0dadd87f41
 # ╠═3da741ce-f54f-4be7-b0e7-30df31814656
+# ╠═96d35722-e894-490b-a21d-20559fc6ac60
 # ╠═264bbea2-2b3e-458b-b9fa-60146a0fb322
 # ╟─e0bcca99-d966-405f-9900-51f95c3ec6bd
 # ╠═be80a489-8b3a-467d-8a3b-27633057815d
@@ -856,6 +866,9 @@ md"""
 # ╠═82980cc9-ecd4-4335-8f62-72c95ffa670f
 # ╟─14050c73-5005-461f-91a6-4703c1ee2b67
 # ╠═bd76575f-57f6-465b-a1c4-d94ac0ff7113
+# ╠═a0a37728-0e8f-400a-b8f7-2610bf9580ce
+# ╠═f4a19853-2bf9-4605-ab1d-69d1f522159c
+# ╠═e6dae7b1-11a4-4c9e-bed3-536a29201d5d
 # ╟─815b73d9-fa9a-4d4e-97ad-5daf1b8da5d9
 # ╠═adda20b5-a788-40da-8d1c-38b71f03d69f
 # ╠═db122fd6-b0c9-4e60-b3c0-6b990e9e3619
