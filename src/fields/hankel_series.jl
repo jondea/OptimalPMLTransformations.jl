@@ -10,45 +10,70 @@ function +(u1::SingleAngularFourierMode, u2::SingleAngularFourierMode)
     HankelSeries(u1.k, Dict(u1.m=>u1.a, u2.m=>u2.a))
 end
 
-function (f::HankelSeries)(p::PolarCoordinates)
-    r = p.r
-    θ = p.θ
-    k = f.k
-    h = zero(k)
-    for m in eachindex(f.a)
-        @inbounds a = f.a[m]
-        h += a * exp(im*m*θ) * hankelh1(m, k*r)
-    end
-    return h
+function padded_hankelh1_vec(indices, z, padding)
+    n_vec = padded_range(indices, padding)
+    return OffsetVector(hankelh1.(n_vec, z), n_vec)
 end
 
-function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}}, p::PolarCoordinates)
+u(h::HankelSeries,θ::Number,H::AbstractVector)        = sum(n -> h.a[n] * exp(im*θ*n) *               H[n], eachindex(h.a))
+∂u_∂tr(h::HankelSeries,θ::Number,H::AbstractVector)   = sum(n -> h.a[n] * exp(im*θ*n) * h.k*         (H[n-1] - H[n+1])/2, eachindex(h.a))
+∂2u_∂tr2(h::HankelSeries,θ::Number,H::AbstractVector) = sum(n -> h.a[n] * exp(im*θ*n) * h.k*h.k*     (H[n-2] - 2*H[n] + H[n+2])/4, eachindex(h.a))
+∂3u_∂tr3(h::HankelSeries,θ::Number,H::AbstractVector) = sum(n -> h.a[n] * exp(im*θ*n) * h.k*h.k*h.k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8, eachindex(h.a))
+
+∂u_∂tθ(h::HankelSeries,θ,H)     = sum(n -> h.a[n] * im*n*exp(im*θ*n) *     H[n], eachindex(h.a))
+∂2u_∂tr∂tθ(h::HankelSeries,θ,H) = sum(n -> h.a[n] * im*n*exp(im*θ*n) * h.k* (H[n-1] - H[n+1])/2, eachindex(h.a))
+
+@generated function eval_hankel(h, NT, p, order_valtype)>
+
+    tuple_symbols = collect(NT.parameters[1])
+    order = order_valtype.parameters[1]
+
+    parsed_src = Meta.parseall("""
     r = p.r
     θ = p.θ
-    k = f.k
-    a = f.a
-    n_vec = (minimum(eachindex(a))-3):(maximum(eachindex(a))+3)
-    H = OffsetVector(hankelh1.(n_vec, k*r), n_vec)
+    k = h.k
+    a = h.a
+    if isnan(k*r)
+        cnan = (1 + im)*typeof(k*r)(NaN)
+        return (;$(join(["$s = cnan" for s in tuple_symbols],',')))
+    end
 
-    eⁱᶿ = exp(im*θ)
-    ∑(fnc) = sum(fnc, eachindex(a))
+    H = padded_hankelh1_vec(eachindex(a), k*r, $order)
+    return (;$(join(["$s = $s(h,θ,H)" for s in tuple_symbols],',')))
+    """)
+    parsed_src.head = :block
+    return parsed_src
+end
 
-    u        = ∑(n -> a[n] * (eⁱᶿ^n) *         H[n])
-    ∂u_∂tr   = ∑(n -> a[n] * (eⁱᶿ^n) * k*     (H[n-1] - H[n+1])/2)
-    ∂2u_∂tr2 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*   (H[n-2] - 2*H[n] + H[n+2])/4)
-    ∂3u_∂tr3 = ∑(n -> a[n] * (eⁱᶿ^n) * k*k*k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8)
+truenamedtuple(nt) = nt(ntuple(_->true, length(nt.body.parameters[1])))
 
-    ∂u_∂tθ     = ∑(n -> a[n] * im*n*(eⁱᶿ^n) *     H[n])
-    ∂2u_∂tr∂tθ = ∑(n -> a[n] * im*n*(eⁱᶿ^n) * k* (H[n-1] - H[n+1])/2)
+padding_needed(::Type{NamedTuple{(:u,)}}) = Val{0}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tθ)}}) = Val{0}()
+padding_needed(::Type{NamedTuple{(:∂u_∂tr,)}}) = Val{1}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr)}}) = Val{1}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ)}}) = Val{1}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2)}}) = Val{2}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ)}}) = Val{2}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}}) = Val{3}()
+padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}}) = Val{3}()
 
-    return (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)
+function (f::HankelSeries)(nt::Type{T}, p::PolarCoordinates) where T<:NamedTuple
+    eval_hankel(f, truenamedtuple(nt), p, padding_needed(nt))
+end
+
+function (f::HankelSeries)(p::PolarCoordinates)
+    f(NamedTuple{(:u,)}, p).u
+end
+
+function ∂u_∂tr(f::HankelSeries, p::PolarCoordinates)
+    f(NamedTuple{(:∂u_∂tr,)}, p).∂u_∂tr
 end
 
 function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}}, p::PMLCoordinates, pml::AnnularPML)
 
     polar_coords = convert(PolarCoordinates, p, pml)
 
-    (u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}, polar_coords)
+    (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ, ∂3u_∂tr3)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ, :∂3u_∂tr3)}, polar_coords)
 
     ∂tr_∂tν = pml.δ
 
@@ -58,6 +83,43 @@ function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :�
     ∂2u_∂tν∂tζ = ∂2u_∂tr∂tθ*∂tr_∂tν
     ∂3u_∂tν3 = ∂3u_∂tr3*∂tr_∂tν^3
     return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ, ∂3u_∂tν3)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tζ)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tθ)  = f(NamedTuple{(:u, :∂u_∂tθ)}, polar_coords)
+
+    ∂u_∂tζ = ∂u_∂tθ
+    return (;u, ∂u_∂tζ)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tr)  = f(NamedTuple{(:u, :∂u_∂tr)}, polar_coords)
+
+    ∂tr_∂tν = pml.δ
+
+    ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
+    return (;u, ∂u_∂tν)
+end
+
+function (f::HankelSeries)(::Type{NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ)}}, p::PMLCoordinates, pml::AnnularPML)
+
+    polar_coords = convert(PolarCoordinates, p, pml)
+
+    (;u, ∂u_∂tr, ∂u_∂tθ, ∂2u_∂tr2, ∂2u_∂tr∂tθ)  = f(NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂2u_∂tr∂tθ)}, polar_coords)
+
+    ∂tr_∂tν = pml.δ
+
+    ∂u_∂tν = ∂u_∂tr*∂tr_∂tν
+    ∂u_∂tζ = ∂u_∂tθ
+    ∂2u_∂tν2 = ∂2u_∂tr2*∂tr_∂tν^2
+    ∂2u_∂tν∂tζ = ∂2u_∂tr∂tθ*∂tr_∂tν
+    return (;u, ∂u_∂tν, ∂u_∂tζ, ∂2u_∂tν2, ∂2u_∂tν∂tζ)
 end
 
 diffbesselj(ν, z, h=besselj(ν, z), hm1=besselj(ν-1, z)) = hm1 - ν/z*h
