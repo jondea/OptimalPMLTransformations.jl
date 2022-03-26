@@ -194,13 +194,13 @@ end
 # ╔═╡ 3d698126-45b0-4b6c-95db-7c284961e2e0
 let
 	# Geometry parameters
-	λ = 1.0          # Wavelength (arbitrary unit)
+	λ = 0.5          # Wavelength (arbitrary unit)
 	Y = 4.0          # Width of the area
 	X = 6.0          # Height of the area
 	a = 1.0          # Radius of the cylinder
 	δ_pml = 0.8      # Thickness of the PML
 
-	resol = 1.0      # Number of points per wavelength
+	resol = 5.0      # Number of points per wavelength
 	lc = λ/resol      # Characteristic length
 
 	generate_and_save_mesh(X,Y,a,δ_pml,lc)
@@ -223,16 +223,19 @@ We use the first-order lagrangian as the finite element function space basis. Th
 """
 
 # ╔═╡ 821a015b-e8e1-47a9-9124-d2431ac6ac75
-order = 1
+order = 3
 
 # ╔═╡ 371d409a-447a-46da-88bf-bc6e24c48c7d
 reffe = ReferenceFE(lagrangian,Float64,order)
 
 # ╔═╡ 9ec6187a-1393-4496-b508-fc54294a32f0
-V = TestFESpace(model,reffe,dirichlet_tags="DirichletEdges",vector_type=Vector{ComplexF64})
+V = TestFESpace(model,reffe,dirichlet_tags=["Cylinder", "PMLOuter"], vector_type=Vector{ComplexF64})
+
+# ╔═╡ 13b018b6-3379-4c1b-9dca-a5157e9cd62b
+u_D(x) = 1.0 + 0.0im
 
 # ╔═╡ 58e98595-6015-44ef-8f20-f44cc954b2fe
-U = V # mathematically equivalent to TrialFESpace(V,0)
+U = TrialFESpace(V,u_D)
 
 # ╔═╡ ddead707-c0f6-4e9e-a12c-0b69eae32d74
 md"""
@@ -245,7 +248,7 @@ We generate the triangulation and a second-order Gaussian quadrature for the num
 """
 
 # ╔═╡ c4b1c3ae-1e5c-43aa-97ac-33eb17cbaa6a
-degree = 2
+degree = 3
 
 # ╔═╡ 6ce7d52b-b7a3-46d7-8966-86b93228b04d
 Ω = Triangulation(model)
@@ -261,13 +264,6 @@ end
 
 # ╔═╡ 5fb2241c-3bf0-4a02-8234-b165d6259c9c
 dΩ = Measure(Ω,degree)
-
-# ╔═╡ 63ac2bba-b66b-4eb4-86ad-fd8fbb7f7b76
-# ### Source triangulation
-Γ = BoundaryTriangulation(model;tags="Source")
-
-# ╔═╡ ca6f374b-b098-4123-97ed-61529f4ca54c
-dΓ = Measure(Γ,degree)
 
 # ╔═╡ 5e790bdf-ab97-4fe4-9af5-3670474bb604
 md"""
@@ -381,7 +377,7 @@ Note that we use a element-wise product .* here for the vector-vector product $\
 """
 
 # ╔═╡ 1879c441-509b-4506-a0ea-6b38e0105ece
-
+k
 
 # ╔═╡ eb27ab8a-ad56-451f-9568-c97690e844ce
 # a(u,v) = ∫( ( J\∇(v)⋅J\∇(u) - (k^2*(v*u))  )*det(J))*dΩ
@@ -407,12 +403,22 @@ uh = solve(op)
 
 # ╔═╡ 3e36acc8-c468-4c11-a3cb-0fe0f9cece4d
 let
-	fig = plot(Ω, real.(first.(uh.cell_dof_values)))
+	fig = plot(Ω, real(uh))
 	wireframe!(Ω, color=RGBA(1,1,1,0.1), linewidth=0.5)
 	cam2d!(fig.figure.scene, reset = Keyboard.left_control)
 	# scatter!(Ω, marker=:star8, markersize=20, color=:blue)
 	fig
 end
+
+# ╔═╡ 686a5cea-1c9e-4cc0-9f1b-286a64701a32
+uh_re = real(uh)
+
+# ╔═╡ ee9c4d2b-705b-4ff3-84a2-75cf10938dc1
+writevtk(Ω,"demo",cellfields=["Real"=>real(uh),
+        "Imag"=>imag(uh),
+        "Norm"=>abs2(uh),
+        # "Arg"=>angle(uh),
+        ])
 
 # ╔═╡ 7cfe7698-c04e-4b6a-bbde-9de54b93df3e
 md"""
@@ -2155,13 +2161,12 @@ version = "3.5.0+0"
 # ╠═821a015b-e8e1-47a9-9124-d2431ac6ac75
 # ╠═371d409a-447a-46da-88bf-bc6e24c48c7d
 # ╠═9ec6187a-1393-4496-b508-fc54294a32f0
+# ╠═13b018b6-3379-4c1b-9dca-a5157e9cd62b
 # ╠═58e98595-6015-44ef-8f20-f44cc954b2fe
 # ╟─ddead707-c0f6-4e9e-a12c-0b69eae32d74
 # ╠═c4b1c3ae-1e5c-43aa-97ac-33eb17cbaa6a
 # ╠═6ce7d52b-b7a3-46d7-8966-86b93228b04d
 # ╠═5fb2241c-3bf0-4a02-8234-b165d6259c9c
-# ╠═63ac2bba-b66b-4eb4-86ad-fd8fbb7f7b76
-# ╠═ca6f374b-b098-4123-97ed-61529f4ca54c
 # ╟─5e790bdf-ab97-4fe4-9af5-3670474bb604
 # ╠═d09981ef-e435-4367-9be1-cfd2d0e91312
 # ╠═ebe86f17-6c65-4d6a-820f-ecf8eb208a0f
@@ -2188,6 +2193,8 @@ version = "3.5.0+0"
 # ╠═ad22f43c-64b9-4c17-92eb-0d9a8d264f4c
 # ╠═83db2f34-7089-42bc-8e2e-d4cdd4e696fd
 # ╠═3e36acc8-c468-4c11-a3cb-0fe0f9cece4d
+# ╠═686a5cea-1c9e-4cc0-9f1b-286a64701a32
+# ╠═ee9c4d2b-705b-4ff3-84a2-75cf10938dc1
 # ╟─7cfe7698-c04e-4b6a-bbde-9de54b93df3e
 # ╠═7ba09689-ffd5-4c58-8a81-a1089b4fd00d
 # ╠═a79d510b-c0cd-4523-b848-9e143092f9a1
