@@ -4,6 +4,18 @@
 using Markdown
 using InteractiveUtils
 
+# ╔═╡ 0de7404b-46bd-4462-b6f9-413a86cde6a2
+using WGLMakie,GridapMakie
+
+# ╔═╡ a325e6bf-549d-46fe-8fa7-8bcd1a78d017
+using StaticArrays
+
+# ╔═╡ 7ba09689-ffd5-4c58-8a81-a1089b4fd00d
+using SpecialFunctions
+
+# ╔═╡ 83db2f34-7089-42bc-8e2e-d4cdd4e696fd
+using Colors
+
 # ╔═╡ 2b1f6cbc-7f38-4573-a722-22668837de03
 using Gridap
 
@@ -16,117 +28,43 @@ using Gridap.Fields
 # ╔═╡ 1d772e87-2143-498f-bdf0-b1594b8d31e3
 using Gridap.Geometry
 
-# ╔═╡ 0de7404b-46bd-4462-b6f9-413a86cde6a2
-using WGLMakie,GridapMakie
-
-# ╔═╡ 83db2f34-7089-42bc-8e2e-d4cdd4e696fd
-using Colors
-
-# ╔═╡ 7ba09689-ffd5-4c58-8a81-a1089b4fd00d
-using SpecialFunctions
-
 # ╔═╡ cb382b58-16e1-45ab-8099-6f812c956071
 md"""
-# Electromagnetic scatering in 2D
-In this tutorial, we will learn:
+# PML Helmholtz equation in 2D
 
-  * How to formulate the weak form for a scalar time-harmonic electromagnetic problem
-  * How to implement a perfectly matched layer (PML) to absorb outgoing waves
-  * How to impose periodic boundary conditions in Gridap
-  * How to discretize PDEs with complex-valued solutions
-
-## Problem statement
-
-We are going to solve a scalar electromagnetic wave scattering problem: a plane wave (Hz-polarized $H_{inc}$) scattering of a dielectric cylinder (of radius $R$ and permittivity $\varepsilon$), as illustrated below. The computational cell is of height $H$ and length $L$, and we employ a perfectly matched layer (PML) thickness of $d_{pml}$ to implement outgoing (radiation) boundary conditions for this finite domain.
-
-![](../assets/emscatter/Illustration.png)
-
-From Maxwell's equations, considering a time-harmonic electromagnetic field, we can derive the governing equation of this problem in 2D (Helmholtz equation) [1]:
-
-```math
-\left[-\nabla\cdot\frac{1}{\varepsilon(x)}\nabla -k^2\mu(x)\right] H = f(x),
-```
-
-where $k=\omega/c$ is the wave number in free space and $f(x)$ is the source term (which corresponds to a magnetic current density in Maxwell's equations).
-
-In order to simulate this scattering problem in a finite computation cell, we need outgoing (radiation) boundary conditions such that all waves at the boundary would not be reflected back since we are simulating an infinite space.
-One commonly used technique to simulate such infinite space is through the so called "perfectly matched layers" (PML) [2]. Actually, PML is not a boundary condition but an artificial absorbing "layer" that absorbs waves with minimal reflections (going to zero as the resolution increases).
-There are many formulations of PML. Here, we use one of the most flexible formulations, the "stretched-coordinate" formulation, which takes the following replace in the PDE [3]:
-
-```math
-\frac{\partial}{\partial x}\rightarrow \frac{1}{1+\mathrm{i}\sigma(u_x)/\omega}\frac{\partial}{\partial x},
-```
-
-```math
-\frac{\partial}{\partial y}\rightarrow \frac{1}{1+\mathrm{i}\sigma(u_y)/\omega}\frac{\partial}{\partial y},
-```
-
-where $u_{x/y}$ is the depth into the PML, $\sigma$ is a profile function (here we chose $\sigma(u)=\sigma_0(u/d_{pml})^2$) and different derivative corresponds to different absorption directions.
-Note that at a finite mesh resolution, PML reflects some waves, and the standard technique to mitigate this is to "turn on" the PML absorption gradually—in this case we use a quadratic profile. The amplitude $\sigma_0$ is chosen so that in the limit of infinite resolution the "round-trip" normal-incidence is some small number.
-
-Since PML absorbs all waves in $x/y$ direction, the associated boundary condition is then usually the zero Dirichlet boundary condition. Here, the boundary conditions are zero Dirichlet boundary on the top and bottom side $\Gamma_D$ but periodic boundary condition on the left ($\Gamma_L$) and right side ($\Gamma_R$).
-The reason that we use a periodic boundary condition for the left and right side instead of zero Dirichlet boundary condition is that we want to simulate a plane wave exicitation, which then requires a periodic boundary condition.
-
-Consider $\mu(x)=1$ (which is mostly the case in electromagnetic problems) and denote $\Lambda=\operatorname{diagm}(\Lambda_x,\Lambda_y)$ where $\Lambda_{x/y}=\frac{1}{1+\mathrm{i}\sigma(u_{x/y})/\omega}$, we can formulate the problem as
-
-```math
-\left\{ \begin{aligned}
-\left[-\Lambda\nabla\cdot\frac{1}{\varepsilon(x)}\Lambda\nabla -k^2\right] H &= f(x) & \text{ in } \Omega,\\
-H&=0 & \text{ on } \Gamma_D,\\
-H|_{\Gamma_L}&=H|_{\Gamma_R},&\\
-\end{aligned}\right.
-```
-For convenience, in the weak form and Julia implementation below we represent $\Lambda$ as a vector instead of a diagonal $2 \times 2$ matrix, in which case $\Lambda\nabla$ becomes the elementwise product.
-
-## Numerical scheme
-
-Similar to the previous tutorials, we need to construct the weak form for the above PDEs. After integral by part and removing the zero boundary integral term, we get:
-
-```math
-a(u,v) = \int_\Omega \left[\nabla(\Lambda v)\cdot\frac{1}{\varepsilon(x)}\Lambda\nabla u-k^2uv\right]\mathrm{d}\Omega
-```
-
-```math
-b(v) = \int_\Omega vf\mathrm{d}\Omega
-```
-Notice that the $\nabla(\Lambda v)$ is also a element-wise "product" of two vectors $\nabla$ and $\Lambda v$.
-
-## Setup
-
-We import the packages that will be used, define the geometry and physics parameters.
 """
 
-# ╔═╡ e32971fc-14c0-4ed6-a563-8ba5633147ed
-λ = 1.0          # Wavelength (arbitrary unit)
+# ╔═╡ da50bbc7-403e-490d-a30e-b7a4efb89a8c
+md"""
+## Physical parameters
+
+We define the geometry and physics parameters.
+"""
+
+# ╔═╡ 2279ecc7-6526-4819-a5ea-e40a66f7d95a
+k = 5.0
+
+# ╔═╡ 33ea3131-bdb4-45a3-973c-e4c60a4c645b
+λ = 2π/k
 
 # ╔═╡ be580a34-c070-481c-ad6f-ffed29e6fc3b
-L = 4.0          # Width of the area
+X = 4.0          # Width of the area
 
 # ╔═╡ b848e3c7-3b46-41e0-aa78-ff4fcfcb0857
-H = 6.0          # Height of the area
-
-# ╔═╡ d0bb4403-176e-4212-8a52-161324ca8d28
-xc = [0 -1.0]    # Center of the cylinder
+Y = 4.0          # Height of the area
 
 # ╔═╡ 3d2e2bff-4d55-42e6-8ff8-540be800dca0
-r = 1.0          # Radius of the cylinder
+r_c = 1.0          # Radius of the cylinder
 
 # ╔═╡ 034816e3-8e5b-4409-b52b-e06fe8cd2933
-δ_pml = 0.8      # Thickness of the PML
-
-# ╔═╡ 033fa122-d80e-4df5-b451-64aba1be8a54
-k = 2*π/λ        # Wave number
-
-# ╔═╡ b556b8be-9c58-43bb-b0df-29513147ab4d
-const ϵ₁ = 3.0   # Relative electric permittivity for cylinder
+δ_pml = 1.0      # Thickness of the PML
 
 # ╔═╡ 85abed5a-5cd2-4b89-8928-07c8f48de368
 md"""
 ## Discrete Model
 
-We import the model from the `geometry.msh` mesh file using the `GmshDiscreteModel` function defined in `GridapGmsh`. The mesh file is created with GMSH in Julia (see the file ../assets/emscatter/MeshGenerator.jl). Note that this mesh file already contains periodic boundary information for the left and right side, and that is enough for gridap to realize a periodic boundary condition should be implemented.
+We import the model from the `geometry.msh` mesh file using the `GmshDiscreteModel` function defined in `GridapGmsh`. The mesh file is created with GMSH in Julia.
 """
-
 
 # ╔═╡ 4b8e79e3-3841-4f58-bbe6-4b7f72c2739f
 import GridapGmsh: gmsh,GmshDiscreteModel
@@ -191,20 +129,14 @@ function generate_and_save_mesh(X,Y,a,δ_pml,lc)
     gmsh.finalize()
 end
 
-# ╔═╡ 3d698126-45b0-4b6c-95db-7c284961e2e0
-let
-	# Geometry parameters
-	λ = 0.5          # Wavelength (arbitrary unit)
-	Y = 4.0          # Width of the area
-	X = 6.0          # Height of the area
-	a = 1.0          # Radius of the cylinder
-	δ_pml = 0.8      # Thickness of the PML
+# ╔═╡ 25f93e89-3c00-4e40-a7a0-93e0d8a8ce9b
+resol = 10.0      # Number of points per wavelength in mesh
 
-	resol = 5.0      # Number of points per wavelength
-	lc = λ/resol      # Characteristic length
+# ╔═╡ 12e2d719-c74a-4632-85d5-a8c253ba7ade
+l_c = λ/resol      # Characteristic length
 
-	generate_and_save_mesh(X,Y,a,δ_pml,lc)
-end
+# ╔═╡ 4e9bd8da-1e16-4ada-88da-676d5562827d
+generate_and_save_mesh(X,Y,r_c,δ_pml,l_c)
 
 # ╔═╡ 356a4ad6-4d28-479d-8a59-468bb59529bf
 model = GmshDiscreteModel("geometry.msh")
@@ -215,9 +147,6 @@ typeof(model.grid)
 # ╔═╡ 49ee6e73-ccf3-47cf-b99c-60f79b5727c2
 md"""
 ## FE spaces
-
-We use the first-order lagrangian as the finite element function space basis. The dirihlet edges are labeld with `DirichletEdges` in the mesh file. Since our problem involves complex numbers (because of PML), we need to assign the `vector_type` to be `Vector{ComplexF64}`.
-
 
 ### Test and trial finite element function space
 """
@@ -231,8 +160,11 @@ reffe = ReferenceFE(lagrangian,Float64,order)
 # ╔═╡ 9ec6187a-1393-4496-b508-fc54294a32f0
 V = TestFESpace(model,reffe,dirichlet_tags=["Cylinder", "PMLOuter"], vector_type=Vector{ComplexF64})
 
+# ╔═╡ 042aaaf8-3b64-44e8-b26c-245960ca85fd
+md"We apply unit Dirichlet conditions on the inner cylinder, and zero Dirichlet conditions on the outer PML boundary."
+
 # ╔═╡ 13b018b6-3379-4c1b-9dca-a5157e9cd62b
-u_D(x) = 1.0 + 0.0im
+u_D(x) = (1.0 + 0.0im) * (norm(x) < r_c*1.1)
 
 # ╔═╡ 58e98595-6015-44ef-8f20-f44cc954b2fe
 U = TrialFESpace(V,u_D)
@@ -241,14 +173,10 @@ U = TrialFESpace(V,u_D)
 md"""
 ## Numerical integration
 
-We generate the triangulation and a second-order Gaussian quadrature for the numerial integration. Note that we create a boundary triangulation from a `Source` tag for the line excitation. Generally, we do not need such additional mesh tags for the source, we can use a delta function to approximate such line source excitation. However, by generating a line mesh, we can increase the accuracy of this source excitation.
-
-
-### Generate triangulation and quadrature from model
 """
 
 # ╔═╡ c4b1c3ae-1e5c-43aa-97ac-33eb17cbaa6a
-degree = 3
+degree = order*2
 
 # ╔═╡ 6ce7d52b-b7a3-46d7-8966-86b93228b04d
 Ω = Triangulation(model)
@@ -269,89 +197,7 @@ dΩ = Measure(Ω,degree)
 md"""
 ## PML formulation
 
-Here we first define a `s_PML` function: $s(x)=1+\mathrm{i}\sigma(u)/\omega,$ and its derivative `ds_PML`. The parameter `LH` indicates the size of the inner boundary of the PML regions. Finally, we create a function-like object `Λ` that returns the PML factors and define its derivative in gridap.
-Note that here we are defining a "callable object" of type `Λ` that encapsulates all of the PML parameters. This is convenient, both because we can pass lots of parameters around easily and also because we can define additional methods on `Λ`, e.g. to express the `∇(Λv)` operation.
-
-
-### PML parameters
 """
-
-# ╔═╡ d09981ef-e435-4367-9be1-cfd2d0e91312
-Rpml = 1e-12      # Tolerence for PML reflection
-
-# ╔═╡ ebe86f17-6c65-4d6a-820f-ecf8eb208a0f
-σ = -3/4*log(Rpml)/δ_pml # σ_0
-
-# ╔═╡ fe2cd95b-2a5e-4d73-80a2-d6b5201549d4
-LH = [L,H] # Size of the PML inner boundary (a rectangular centere at (0,0))
-
-# ╔═╡ 721e979e-e102-408e-b2c8-0f00531b15d0
-# ### PML coordinate streching functions
-function s_PML(x,σ,k,LH,δ_pml)
-    u = abs.(Tuple(x)).-LH./2  # get the depth into PML
-    return @. ifelse(u > 0,  1+(1im*σ/k)*(u/δ_pml)^2, $(1.0+0im))
-end
-
-# ╔═╡ c7390e93-3a66-42a0-8971-0078dea083bc
-function ds_PML(x,σ,k,LH,δ_pml)
-    u = abs.(Tuple(x)).-LH./2 # get the depth into PML
-    ds = @. ifelse(u > 0, (2im*σ/k)*(1/δ_pml)^2*u, $(0.0+0im))
-    return ds.*sign.(Tuple(x))
-end
-
-# ╔═╡ 0813217c-0b06-4991-99c1-7f70706fd726
-begin
-	struct Λ<:Function
-	    σ::Float64
-	    k::Float64
-	    LH::Vector{Float64}
-	    δ_pml::Float64
-	end
-	function (Λf::Λ)(x)
-	    s_x,s_y = s_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)
-	    return VectorValue(1/s_x,1/s_y)
-	end
-end
-
-# ╔═╡ 146b3f7b-dcce-4e39-928d-a88a04284dfb
-Fields.∇(Λf::Λ) = x->TensorValue{2,2,ComplexF64}(-(Λf(x)[1])^2*ds_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)[1],0,0,-(Λf(x)[2])^2*ds_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)[2])
-
-# ╔═╡ 8cb354e5-448d-47c3-bb67-f5ac5992144d
-md"""
-## Weak form
-
-In the mesh file, we labeled the cylinder region with `Cylinder` to distinguish it from other regions. Using this tag, we can assign material properties correspondingly (basically a function with different value in different regions). The weak form is very similar to its mathematical form in gridap.
-
-
-### Intermediate variables
-"""
-
-# ╔═╡ 4409d494-5e90-420e-9ea4-20ec0c7f28d1
-labels = get_face_labeling(model)
-
-# ╔═╡ 4014a378-6f31-4a60-b609-e221893a7590
-dimension = num_cell_dims(model)
-
-# ╔═╡ d782b505-858e-4a26-b7c5-70054a6a3dcf
-tags = get_face_tag(labels,dimension)
-
-# ╔═╡ b677ede0-8d35-41d3-b9a0-dd09f67dd3fd
-const cylinder_tag = get_tag_from_name(labels,"Cylinder")
-
-# ╔═╡ 0016ed55-b3ec-4bb5-aa5d-de8cbd6b3b40
-function ξ(tag)
-    if tag == cylinder_tag
-        return 1/ϵ₁
-    else
-        return 1.0
-    end
-end
-
-# ╔═╡ 4c06bfb0-66b5-4c2a-ac25-0ea6d5a4ebdb
-τ = CellField(tags,Ω)
-
-# ╔═╡ d341bef6-5d72-427e-9818-c65cf2c2d74c
-Λf = Λ(σ,k,LH,δ_pml)
 
 # ╔═╡ 5a20ed81-bbb2-4564-a0b6-f2b207a6d3e6
 begin
@@ -360,38 +206,62 @@ begin
 		X::SVector{2,Float64}
 		δ::Float64
 	end
+	function x_to_ν(pml::PMLTransformation, x)
+		(abs.(x) .- abs.(pml.X))./pml.δ
+	end
+	function tx(pml::PMLTransformation, ν::Number)
+		k = pml.k; δ = pml.δ
+		ν > 0 ? X .- im/pml.k*log.(1-ν) : one(im*ν) 
+	end
 	function (pml::PMLTransformation)(x)
-	    s_x,s_y = s_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)
-	    return VectorValue(1/s_x,1/s_y)
+		ν = x_to_ν(pml, x)
+		tx = X .- im/pml.k*log.(1-ν)
+	    return VectorValue(tx[1],tx[2])
+	end
+	function ∂tx_∂x(pml::PMLTransformation, ν::Number)
+		k = pml.k; δ = pml.δ
+		ν > 0 ? im/(k*δ)/(1-ν) : one(im*ν) 
+	end
+	function jacobian(pml::PMLTransformation)
+		return x -> begin
+			ν = x_to_ν(pml, SVector(x[1], x[2]))
+			return TensorValue{2,2,ComplexF64}(∂tx_∂x(pml,ν[1]), 0, 0, ∂tx_∂x(pml,ν[2]))
+		end
 	end
 	function Fields.∇(pml::PMLTransformation)
-
-		x->TensorValue{2,2,ComplexF64}(-(Λf(x)[1])^2*ds_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)[1],0,0,-(Λf(x)[2])^2*ds_PML(x,Λf.σ,Λf.k,Λf.LH,Λf.δ_pml)[2])
+		jacobian(pml)
 	end
 end
 
-# ╔═╡ 1175432a-682e-418c-a9b0-230e800721f5
+# ╔═╡ 8dc64274-8c24-4c48-b260-50478a3e9c6f
+pml = PMLTransformation(k, SVector(X,Y), δ_pml)
+
+# ╔═╡ 8cb354e5-448d-47c3-bb67-f5ac5992144d
 md"""
-### Bi-linear term (from weak form)
-Note that we use a element-wise product .* here for the vector-vector product $\Lambda \nabla$
+## Weak form
+
+Construct the bi-linear weak form of the Helmholtz equation
+
 """
 
-# ╔═╡ 1879c441-509b-4506-a0ea-6b38e0105ece
-k
+# ╔═╡ cb384c0d-6e33-4d68-85e9-924ada655dda
+J = jacobian(pml)
 
 # ╔═╡ eb27ab8a-ad56-451f-9568-c97690e844ce
-# a(u,v) = ∫( ( J\∇(v)⋅J\∇(u) - (k^2*(v*u))  )*det(J))*dΩ
-a(u,v) = ∫( ∇(v)⋅∇(u) - k^2*(v*u))*dΩ
+# Plain Helmholtz: a(u,v) = ∫( ∇(v)⋅∇(u) - k^2*(v*u))*dΩ
+a(u,v) = ∫( ( ((inv∘J)⋅∇(v))⋅((inv∘J)⋅∇(u)) - (k^2*(v*u)) )*(det∘J))*dΩ
+
+# ╔═╡ 0ae4b233-3943-4ee4-b593-4f7bdd4dcdfa
+md"No source"
 
 # ╔═╡ 542439b4-d337-4d9d-8323-089a8c33fe96
-# ### Source term (uniform line source)
 b(v) = 0
 
 # ╔═╡ 81a2859c-71d0-4a59-a7fb-9cd77d50b4d7
 md"""
-## Solver phase
+## Solve
 
-We can assemble the finite element operator in Gridap with the bi-linear and linear form, then solve for the field.
+We assemble the finite element operator in Gridap with the bi-linear and linear form, then solve for the field.
 
 """
 
@@ -403,15 +273,12 @@ uh = solve(op)
 
 # ╔═╡ 3e36acc8-c468-4c11-a3cb-0fe0f9cece4d
 let
-	fig = plot(Ω, real(uh))
+	fig = plot(Ω, real(uh), aspectratio=1.0)
 	wireframe!(Ω, color=RGBA(1,1,1,0.1), linewidth=0.5)
 	cam2d!(fig.figure.scene, reset = Keyboard.left_control)
 	# scatter!(Ω, marker=:star8, markersize=20, color=:blue)
 	fig
 end
-
-# ╔═╡ 686a5cea-1c9e-4cc0-9f1b-286a64701a32
-uh_re = real(uh)
 
 # ╔═╡ ee9c4d2b-705b-4ff3-84a2-75cf10938dc1
 writevtk(Ω,"demo",cellfields=["Real"=>real(uh),
@@ -422,124 +289,20 @@ writevtk(Ω,"demo",cellfields=["Real"=>real(uh),
 
 # ╔═╡ 7cfe7698-c04e-4b6a-bbde-9de54b93df3e
 md"""
-## Analytical solution
-### Theoretical analysis
-In this section, we construct the semi-analytical solution to this scattering problem, for comparison to the numerical solution. This is possible because of the symmetry of the cylinder, which allows us to expand the solutions of the Helmoltz equation in Bessel functions and match boundary conditions at the cylinder interface. (In 3d, the analogous process with spherical harmonics is known as "Mie scattering".) For more information on this technique, see Ref [4].
-In 2D cylinder coordinates, we can expand the plane wave in terms of Bessel functions (this is the Jacobi–Anger identity [5]):
-
-```math
-H_0=\sum_m i^mJ_m(kr)e^{im\theta},
-```
-
-where $m=0,\pm 1,\pm 2,\dots$ and $J_m(z)$ is the Bessel function of the fisrt kind.
-
-For simplicity, we start with only the $m$-th component and take it as the incident part:
-
-```math
-H_{inc}=J_m(kr).
-```
-
-For the scattered field, since the scattered wave should be going out, we can then expand it in terms of the Hankel function of the first kind (outgoing and incoming cylindrical waves are Hankel functions of the first and second kind [6]):
-
-```math
-H_1=\alpha_mH_m^1(kr).
-```
-
-For the fields inside the cylinder, we require the field to be finite at $r=0$, which then constrains the field to be only the expansion of the Bessel functions:
-
-```math
-H_2=\beta_mJ_m(nkr),
-```
-
-where $n=\sqrt{\varepsilon}$ is the refractive index.
-
-Applying the boundary conditions (tangential part of the electric and magnetic field to be continuous):
-
-```math
-H_{inc}+H_1=H_2|_{r=R},
-```
-
-```math
-\frac{\partial H_{inc}}{\partial r}+\frac{\partial H_1}{\partial r}=\frac{1}{\epsilon}\frac{\partial H_2}{\partial r}|_{r=R}.
-```
-
-After some math, we get:
-
-```math
-\alpha_m=\frac{J_m(nkR)J_m(kR)^\prime-\frac{1}{n}J_m(kR)J_m(nkR)^\prime}{\frac{1}{n}H_m^1(kR)J_m(nkr)^\prime-J_m(nkr)H_m^1(kr)^\prime},
-```
-
-```math
-\beta_m = \frac{H_m^1(kR)J_m(kR)^\prime-J_m(kR)H_m^1(kR)^\prime}{\frac{1}{n}J_m(nkR)^\prime H_m^1(kR)-J_m(nkR)H_m^1(kR)^\prime},
-```
-
-where $^\prime$ denotes the derivative, and the derivatives of the Bessel functions are obtained with the recurrent relations:
-
-```math
-Y_m(z)^\prime=\frac{Y_{m-1}(z)-Y_{m+1}(z)}{2}
-```
-
-where $Y_m$ denotes any Bessel functions (Hankel functions).
-
-
-Finally, the analytical field is ($1/2k$ is the amplitude that comes from the unit line source excitation):
-```math
-H(r>R)=\frac{1}{2k}\sum_m\left[\alpha_mi^mH_m^1(kr)+J_m(kr)\right]e^{im\theta}
-```
-
-```math
-H(r\leq R)=\frac{1}{2k}\sum_m\beta_mi^mJ_m(nkr)e^{im\theta}
-```
-
-
-### Define the analytical functions
+## Comparison with analytical solution
 """
 
-# ╔═╡ a79d510b-c0cd-4523-b848-9e143092f9a1
-dbesselj(m,z) = (besselj(m-1,z)-besselj(m+1,z))/2
+# ╔═╡ 1f7fd331-e3e3-4e79-a1b0-1544f5ab5678
+md"Value of hankel function at inner boundary, which we will use to normalise the field to be 1 at inner boundary."
 
-# ╔═╡ 7482d4a3-cb3d-48b3-adb3-62ddd0ef865a
-dhankelh1(m,z)= (hankelh1(m-1,z)-hankelh1(m+1,z))/2
+# ╔═╡ f625145b-5988-407f-8e9c-be47781ac941
+h0 = hankelh1(0,k*r_c)
 
-# ╔═╡ 8e58b553-20c3-470b-88ce-f53ff5affd76
-α(m,n,z) = (besselj(m,n*z)*dbesselj(m,z)-1/n*besselj(m,z)*dbesselj(m,n*z))/(1/n*hankelh1(m,z)*dbesselj(m,n*z)-besselj(m,n*z)*dhankelh1(m,z))
+# ╔═╡ 6ce73844-b3f4-425b-b8d2-d23440e4b879
+md"Construct the analytical solution in finite element basis"
 
-# ╔═╡ 6fb3676b-1a66-4504-b0ea-a68fa70ed163
-β(m,n,z) = (hankelh1(m,z)*dbesselj(m,z)-besselj(m,z)*dhankelh1(m,z))/(1/n*dbesselj(m,n*z)*hankelh1(m,z)-besselj(m,n*z)*dhankelh1(m,z))
-
-# ╔═╡ d1d79565-d71a-4c40-bd5b-432f1cb14765
-function H_t(x,xc,r,ϵ,λ)
-    n = √ϵ
-    k = 2*π/λ
-    θ = angle(x[1]-xc[1]+1im*(x[2]-xc[2]))+π
-    M = 40 # Number of Bessel function basis used
-    H0 = 0
-    if norm([x[1]-xc[1],x[2]-xc[2]])<=r
-        for m=-M:M
-            H0 += β(m,n,k*r)*cis(m*θ)*besselj(m,n*k*norm([x[1]-xc[1],x[2]-xc[2]]))
-        end
-    else
-        for m=-M:M
-            H0 += α(m,n,k*r)*cis(m*θ)*hankelh1(m,k*norm([x[1]-xc[1],x[2]-xc[2]]))+cis(m*θ)*besselj(m,k*norm([x[1]-xc[1],x[2]-xc[2]]))
-        end
-    end
-    return 1im/(2*k)*H0
-end
-
-# ╔═╡ 203294ed-feb7-458f-b22f-6b4bac230a43
-#
-# ### Construct the analytical solution in finite element basis
-# uh_t = CellField(x->H_t(x,xc,r,ϵ₁,λ),Ω)
-
-# ╔═╡ 1cacb0f1-7874-4eee-95da-afb7d62ef64f
-md"""
-## Output and compare results
-
-The simulated field is shown below. We can see that the simulated fields and the analytical solution matched closed except for the top and PML regions. This is because the simulated source generate plane waves in two directions but we only consider the downward propagating wave in the analytical solution and the PML effect is also not considered in the analytical solution. Therefore, we just need to focus on the "center" regions which excludes the PML and top region above the source, the difference is within 6% of the field amplitude integral. As we increase the resolution, this difference should decrease (until it becomes limited by the PML reflection coefficient from $\sigma_0$, the number of Bessel function basis $M$ or by floating-point error.)
-![](../assets/emscatter/Results.png)
-
-### Save to file and view
-"""
+# ╔═╡ 5a391731-d63e-44f2-a723-6e669d8f4341
+uh_t = CellField(x->hankelh1(0,k*norm(x))/h0, Ω)
 
 # ╔═╡ eda67024-2652-49a3-8008-f4d87611cb64
 # writevtk(Ω,"demo",cellfields=["Real"=>real(uh),
@@ -551,9 +314,9 @@ The simulated field is shown below. We can see that the simulated fields and the
 #         "Difference"=>abs(uh_t-uh)])
 
 # ╔═╡ 2c4db0e3-1e2d-4f85-87e8-e52c243e252a
-# ### Compare the difference in the "center" region
-function AnalyticalBox(x) # Get the "center" region
-    if abs(x[1])<L/2 && abs(x[2]+0.5)<2.5
+# ### Compare the difference in the bulk
+function Bulk(x)
+    if abs(x[1])<X && abs(x[2])<Y
         return 1
     else
         return 0
@@ -561,26 +324,20 @@ function AnalyticalBox(x) # Get the "center" region
 end
 
 # ╔═╡ 89204ee5-b7cb-4828-aed1-c625fab3d4fd
-Difference=sqrt(sum(∫(abs2(uh_t-uh)*AnalyticalBox)*dΩ)/sum(∫(abs2(uh_t)*AnalyticalBox)*dΩ))
+Difference=sqrt(sum(∫(abs2(uh_t-uh)*Bulk)*dΩ)/sum(∫(abs2(uh_t)*Bulk)*dΩ))
 
-# ╔═╡ 55161119-2673-4c04-b872-3f18796a72dd
-@assert Difference < 0.1
+# ╔═╡ 75a8817c-1047-4dca-893b-30dbf3bf1b9c
+let
+	fig = plot(Ω, abs(uh - uh_t)*Bulk, colormap=:heat)
+	# Colorbar(fig[1,2], plt)
+	# wireframe!(Ω, color=RGBA(1,1,1,0.1), linewidth=0.5)
+	cam2d!(fig.figure.scene, reset = Keyboard.left_control)
+	# scatter!(Ω, marker=:star8, markersize=20, color=:blue)
+	fig
+end
 
-# ╔═╡ 4201e390-b137-4f81-a9a1-7c623d3e3fd1
-md"""
-## References
-[1] [Wikipedia: Electromagnetic wave equation](https://en.wikipedia.org/wiki/Electromagnetic_wave_equation)
-
-[2] [Wikipedia: Perfectly matched layer](https://en.wikipedia.org/wiki/Perfectly_matched_layer)
-
-[3] A. Oskooi and S. G. Johnson, “[Distinguishing correct from incorrect PML proposals and a corrected unsplit PML for anisotropic, dispersive media](http://math.mit.edu/~stevenj/papers/OskooiJo11.pdf),” Journal of Computational Physics, vol. 230, pp. 2369–2377, April 2011.
-
-[4] Stratton, J. A. (1941). Electromagnetic Theory. New York: McGraw-Hill.
-
-[5] [Wikipedia: Jacobi–Anger expansion](https://en.wikipedia.org/wiki/Jacobi%E2%80%93Anger_expansion)
-
-[6] [Wikipedia: Bessel function](https://en.wikipedia.org/wiki/Bessel_function)
-"""
+# ╔═╡ 7aa86c69-c366-4a0d-8b8d-36756975b15e
+md"## Dependencies"
 
 # ╔═╡ be59001e-b529-49ff-beeb-d901d1bc11cb
 html"""
@@ -599,6 +356,7 @@ Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 GridapGmsh = "3025c34a-b394-11e9-2a55-3fee550c04c8"
 GridapMakie = "41f30b06-6382-4b60-a5f7-79d86b35bf5d"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
@@ -607,6 +365,7 @@ Gridap = "~0.17.9"
 GridapGmsh = "~0.6.0"
 GridapMakie = "~0.1.1"
 SpecialFunctions = "~2.1.4"
+StaticArrays = "~1.4.3"
 WGLMakie = "~0.4.5"
 """
 
@@ -1837,9 +1596,9 @@ version = "0.6.0"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "74fb527333e72ada2dd9ef77d98e4991fb185f04"
+git-tree-sha1 = "4f6ec5d99a28e1a749559ef7dd518663c5eca3d5"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.4.1"
+version = "1.4.3"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -2137,22 +1896,19 @@ version = "3.5.0+0"
 
 # ╔═╡ Cell order:
 # ╟─cb382b58-16e1-45ab-8099-6f812c956071
-# ╠═2b1f6cbc-7f38-4573-a722-22668837de03
-# ╠═5acadaf2-0c4c-494c-a305-27b1c41cc7a2
-# ╠═e10c5855-3713-4a81-b071-8fe14c3aa0af
-# ╠═1d772e87-2143-498f-bdf0-b1594b8d31e3
-# ╠═e32971fc-14c0-4ed6-a563-8ba5633147ed
+# ╟─da50bbc7-403e-490d-a30e-b7a4efb89a8c
+# ╠═2279ecc7-6526-4819-a5ea-e40a66f7d95a
+# ╠═33ea3131-bdb4-45a3-973c-e4c60a4c645b
 # ╠═be580a34-c070-481c-ad6f-ffed29e6fc3b
 # ╠═b848e3c7-3b46-41e0-aa78-ff4fcfcb0857
-# ╠═d0bb4403-176e-4212-8a52-161324ca8d28
 # ╠═3d2e2bff-4d55-42e6-8ff8-540be800dca0
 # ╠═034816e3-8e5b-4409-b52b-e06fe8cd2933
-# ╠═033fa122-d80e-4df5-b451-64aba1be8a54
-# ╠═b556b8be-9c58-43bb-b0df-29513147ab4d
 # ╟─85abed5a-5cd2-4b89-8928-07c8f48de368
 # ╠═4b8e79e3-3841-4f58-bbe6-4b7f72c2739f
 # ╠═4146c37f-e088-473c-b11d-fb926ea4a5c7
-# ╠═3d698126-45b0-4b6c-95db-7c284961e2e0
+# ╠═25f93e89-3c00-4e40-a7a0-93e0d8a8ce9b
+# ╠═12e2d719-c74a-4632-85d5-a8c253ba7ade
+# ╠═4e9bd8da-1e16-4ada-88da-676d5562827d
 # ╠═356a4ad6-4d28-479d-8a59-468bb59529bf
 # ╠═3a00e5aa-957e-40f6-a444-7f076ca4c4e9
 # ╠═0de7404b-46bd-4462-b6f9-413a86cde6a2
@@ -2161,6 +1917,7 @@ version = "3.5.0+0"
 # ╠═821a015b-e8e1-47a9-9124-d2431ac6ac75
 # ╠═371d409a-447a-46da-88bf-bc6e24c48c7d
 # ╠═9ec6187a-1393-4496-b508-fc54294a32f0
+# ╟─042aaaf8-3b64-44e8-b26c-245960ca85fd
 # ╠═13b018b6-3379-4c1b-9dca-a5157e9cd62b
 # ╠═58e98595-6015-44ef-8f20-f44cc954b2fe
 # ╟─ddead707-c0f6-4e9e-a12c-0b69eae32d74
@@ -2168,47 +1925,35 @@ version = "3.5.0+0"
 # ╠═6ce7d52b-b7a3-46d7-8966-86b93228b04d
 # ╠═5fb2241c-3bf0-4a02-8234-b165d6259c9c
 # ╟─5e790bdf-ab97-4fe4-9af5-3670474bb604
-# ╠═d09981ef-e435-4367-9be1-cfd2d0e91312
-# ╠═ebe86f17-6c65-4d6a-820f-ecf8eb208a0f
-# ╠═fe2cd95b-2a5e-4d73-80a2-d6b5201549d4
-# ╠═721e979e-e102-408e-b2c8-0f00531b15d0
-# ╠═c7390e93-3a66-42a0-8971-0078dea083bc
-# ╠═0813217c-0b06-4991-99c1-7f70706fd726
-# ╠═146b3f7b-dcce-4e39-928d-a88a04284dfb
+# ╠═a325e6bf-549d-46fe-8fa7-8bcd1a78d017
 # ╠═5a20ed81-bbb2-4564-a0b6-f2b207a6d3e6
+# ╠═8dc64274-8c24-4c48-b260-50478a3e9c6f
 # ╟─8cb354e5-448d-47c3-bb67-f5ac5992144d
-# ╠═4409d494-5e90-420e-9ea4-20ec0c7f28d1
-# ╠═4014a378-6f31-4a60-b609-e221893a7590
-# ╠═d782b505-858e-4a26-b7c5-70054a6a3dcf
-# ╠═b677ede0-8d35-41d3-b9a0-dd09f67dd3fd
-# ╠═0016ed55-b3ec-4bb5-aa5d-de8cbd6b3b40
-# ╠═4c06bfb0-66b5-4c2a-ac25-0ea6d5a4ebdb
-# ╠═d341bef6-5d72-427e-9818-c65cf2c2d74c
-# ╟─1175432a-682e-418c-a9b0-230e800721f5
-# ╠═1879c441-509b-4506-a0ea-6b38e0105ece
+# ╠═cb384c0d-6e33-4d68-85e9-924ada655dda
 # ╠═eb27ab8a-ad56-451f-9568-c97690e844ce
+# ╟─0ae4b233-3943-4ee4-b593-4f7bdd4dcdfa
 # ╠═542439b4-d337-4d9d-8323-089a8c33fe96
 # ╟─81a2859c-71d0-4a59-a7fb-9cd77d50b4d7
 # ╠═709ed3be-b0f3-42b5-930b-a136c6803165
 # ╠═ad22f43c-64b9-4c17-92eb-0d9a8d264f4c
-# ╠═83db2f34-7089-42bc-8e2e-d4cdd4e696fd
 # ╠═3e36acc8-c468-4c11-a3cb-0fe0f9cece4d
-# ╠═686a5cea-1c9e-4cc0-9f1b-286a64701a32
 # ╠═ee9c4d2b-705b-4ff3-84a2-75cf10938dc1
 # ╟─7cfe7698-c04e-4b6a-bbde-9de54b93df3e
 # ╠═7ba09689-ffd5-4c58-8a81-a1089b4fd00d
-# ╠═a79d510b-c0cd-4523-b848-9e143092f9a1
-# ╠═7482d4a3-cb3d-48b3-adb3-62ddd0ef865a
-# ╠═8e58b553-20c3-470b-88ce-f53ff5affd76
-# ╠═6fb3676b-1a66-4504-b0ea-a68fa70ed163
-# ╠═d1d79565-d71a-4c40-bd5b-432f1cb14765
-# ╠═203294ed-feb7-458f-b22f-6b4bac230a43
-# ╟─1cacb0f1-7874-4eee-95da-afb7d62ef64f
+# ╟─1f7fd331-e3e3-4e79-a1b0-1544f5ab5678
+# ╠═f625145b-5988-407f-8e9c-be47781ac941
+# ╟─6ce73844-b3f4-425b-b8d2-d23440e4b879
+# ╠═5a391731-d63e-44f2-a723-6e669d8f4341
 # ╠═eda67024-2652-49a3-8008-f4d87611cb64
 # ╠═2c4db0e3-1e2d-4f85-87e8-e52c243e252a
 # ╠═89204ee5-b7cb-4828-aed1-c625fab3d4fd
-# ╠═55161119-2673-4c04-b872-3f18796a72dd
-# ╟─4201e390-b137-4f81-a9a1-7c623d3e3fd1
+# ╠═75a8817c-1047-4dca-893b-30dbf3bf1b9c
+# ╟─7aa86c69-c366-4a0d-8b8d-36756975b15e
+# ╠═83db2f34-7089-42bc-8e2e-d4cdd4e696fd
+# ╠═2b1f6cbc-7f38-4573-a722-22668837de03
+# ╠═5acadaf2-0c4c-494c-a305-27b1c41cc7a2
+# ╠═e10c5855-3713-4a81-b071-8fe14c3aa0af
+# ╠═1d772e87-2143-498f-bdf0-b1594b8d31e3
 # ╠═be59001e-b529-49ff-beeb-d901d1bc11cb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
