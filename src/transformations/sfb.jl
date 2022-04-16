@@ -1,16 +1,32 @@
+"""
+SFB(geom, k)
 
+Scale free Bermudez (SFB) transformation defined by the PML geometry (`geom`)
+and wavenumber (`k`).
+
+Scale free Bermudez is a PML transformation proposed in Deakin's PhD
+thesis. It is a slight modification to one proposed by Bermudez et al (2007),
+removing the dependency of the PML thickness in the solution. The transformed
+through-the-PML coordinate is
+```
+tν = -im/k*log(1-ν/δ)
+```
+where `δ` is the PML thickness.
+"""
 struct SFB{G <: PMLGeometry}
+    "Geometry of the PML"
     geom::G
+    "Wavenumber of the equation/field"
     k::Float64
 end
 
 function tν(t::SFB, coords::PMLCoordinates)
-    ν, k, δ = coords.ν, t.k, t.geom.δ
-    return - im/k*log(1-ν/δ)
+    ν, k, δ = coords.ν, t.k, pml_thickness(t.geom)
+    return -im/k*log(1-ν/δ)
 end
 
 function ∂tν_∂ν(t::SFB, coords::PMLCoordinates)
-    ν, k, δ = coords.ν, t.k, t.geom.δ
+    ν, k, δ = coords.ν, t.k, pml_thickness(t.geom)
     return im/(k*δ)/(1-ν)
 end
 
