@@ -16,6 +16,7 @@ begin
 	using LinearAlgebra
 	using SpecialFunctions
 	using Gridap
+	import Gridap: Point
 	using Gridap.Fields
 	using Gridap.Geometry
     using Tau
@@ -30,7 +31,7 @@ end
 
 # ╔═╡ cb382b58-16e1-45ab-8099-6f812c956071
 md"""
-# PML Helmholtz equation in 2D
+# PML Helmholtz equation in Cartesian Annulus
 
 """
 
@@ -70,6 +71,22 @@ l_c = λ/resol      # Characteristic length
 # ╔═╡ 91c19722-cbc3-46fb-acff-dc674e94bf48
 periodic_θ=(false, true)
 
+# ╔═╡ 2ee30f63-0535-4bb5-8bb0-85e6112f394e
+rθ_to_xy = (rθ)->Point(rθ[1]*cos(rθ[2]), rθ[1]*sin(rθ[2]))
+
+# ╔═╡ 356a4ad6-4d28-479d-8a59-468bb59529bf
+model = CartesianDiscreteModel(CartesianDescriptor(Point(r_c,0.0), Point(R+δ_pml, τ), (20,60); map = rθ_to_xy, isperiodic=periodic_θ))
+
+# ╔═╡ 3a00e5aa-957e-40f6-a444-7f076ca4c4e9
+let
+	Ωp = Triangulation(model) # No method yet to plot CartesianGrid?
+	fig = plot(Ωp)
+	wireframe!(Ωp, color=RGBA(0,0,0,0.4), linewidth=0.5)
+	cam2d!(fig.figure.scene, reset = Keyboard.left_control)
+	# scatter!(Ω, marker=:star8, markersize=20, color=:blue)
+	fig
+end
+
 # ╔═╡ 49ee6e73-ccf3-47cf-b99c-60f79b5727c2
 md"""
 ## FE spaces
@@ -83,11 +100,17 @@ order = 3
 # ╔═╡ 371d409a-447a-46da-88bf-bc6e24c48c7d
 reffe = ReferenceFE(lagrangian,Float64,order)
 
+# ╔═╡ 9ec6187a-1393-4496-b508-fc54294a32f0
+V = TestFESpace(model,reffe;conformity=:H1, dirichlet_tags="boundary", vector_type=Vector{ComplexF64})
+
 # ╔═╡ 042aaaf8-3b64-44e8-b26c-245960ca85fd
 md"We apply unit Dirichlet conditions on the inner cylinder, and zero Dirichlet conditions on the outer PML boundary."
 
 # ╔═╡ 13b018b6-3379-4c1b-9dca-a5157e9cd62b
 u_D(x) = (1.0 + 0.0im) * (norm(x) < r_c*1.1)
+
+# ╔═╡ 58e98595-6015-44ef-8f20-f44cc954b2fe
+U = TrialFESpace(V,u_D)
 
 # ╔═╡ ddead707-c0f6-4e9e-a12c-0b69eae32d74
 md"""
@@ -100,6 +123,12 @@ degree = order*2
 
 # ╔═╡ 8051d4fb-620c-4426-a0b7-a6350dd0803c
 md"Why do we have to use triangulation and not the elements directly?"
+
+# ╔═╡ 6ce7d52b-b7a3-46d7-8966-86b93228b04d
+Ω = Triangulation(model)
+
+# ╔═╡ 5fb2241c-3bf0-4a02-8234-b165d6259c9c
+dΩ = Measure(Ω,degree)
 
 # ╔═╡ 5e790bdf-ab97-4fe4-9af5-3670474bb604
 md"""
@@ -117,9 +146,6 @@ md"""
 Construct the bi-linear weak form of the Helmholtz equation
 
 """
-
-# ╔═╡ 9b0e27bf-a67d-45ae-8625-9915b67d05d2
-
 
 # ╔═╡ 0ae4b233-3943-4ee4-b593-4f7bdd4dcdfa
 md"No source"
@@ -149,6 +175,15 @@ h0 = hankelh1(0,k*r_c)
 # ╔═╡ 6ce73844-b3f4-425b-b8d2-d23440e4b879
 md"Construct the analytical solution in finite element basis"
 
+# ╔═╡ 5a391731-d63e-44f2-a723-6e669d8f4341
+uh_t = CellField(x->hankelh1(0,k*norm(x))/h0, Ω)
+
+# ╔═╡ 3d6df51a-91af-427a-8847-9908e0b49980
+uh_t.cell_field
+
+# ╔═╡ 7a453df6-9187-4b9d-a223-b49461119f6f
+print(uh_t)
+
 # ╔═╡ 2c4db0e3-1e2d-4f85-87e8-e52c243e252a
 # ### Compare the difference in the bulk
 function Bulk(x)
@@ -175,37 +210,6 @@ J = x -> begin
 		return TensorValue{2,2,ComplexF64}(j[1,1], j[1,2], j[2,1], j[2,2])
 	end
 end
-
-# ╔═╡ 90e93b81-d929-4b83-8e17-546d45a201bb
-import Gridap: Point
-
-# ╔═╡ 2ee30f63-0535-4bb5-8bb0-85e6112f394e
-rθ_to_xy = (rθ)->Point(rθ[1]*cos(rθ[2]), rθ[1]*sin(rθ[2]))
-
-# ╔═╡ 356a4ad6-4d28-479d-8a59-468bb59529bf
-model = CartesianDiscreteModel(CartesianDescriptor(Point(r_c,0.0), Point(R+δ_pml, τ), (20,60); map = rθ_to_xy, isperiodic=periodic_θ))
-
-# ╔═╡ 3a00e5aa-957e-40f6-a444-7f076ca4c4e9
-let
-	Ωp = Triangulation(model) # No method yet to plot CartesianGrid?
-	fig = plot(Ωp)
-	wireframe!(Ωp, color=RGBA(0,0,0,0.4), linewidth=0.5)
-	cam2d!(fig.figure.scene, reset = Keyboard.left_control)
-	# scatter!(Ω, marker=:star8, markersize=20, color=:blue)
-	fig
-end
-
-# ╔═╡ 9ec6187a-1393-4496-b508-fc54294a32f0
-V = TestFESpace(model,reffe;conformity=:H1, dirichlet_tags="boundary", vector_type=Vector{ComplexF64})
-
-# ╔═╡ 58e98595-6015-44ef-8f20-f44cc954b2fe
-U = TrialFESpace(V,u_D)
-
-# ╔═╡ 6ce7d52b-b7a3-46d7-8966-86b93228b04d
-Ω = Triangulation(model)
-
-# ╔═╡ 5fb2241c-3bf0-4a02-8234-b165d6259c9c
-dΩ = Measure(Ω,degree)
 
 # ╔═╡ eb27ab8a-ad56-451f-9568-c97690e844ce
 # Plain Helmholtz:
@@ -234,15 +238,6 @@ writevtk(Ω,"annulus_xy",cellfields=["Real"=>real(uh),
         "Norm"=>abs2(uh),
         # "Arg"=>angle(uh),
         ])
-
-# ╔═╡ 5a391731-d63e-44f2-a723-6e669d8f4341
-uh_t = CellField(x->hankelh1(0,k*norm(x))/h0, Ω)
-
-# ╔═╡ 3d6df51a-91af-427a-8847-9908e0b49980
-uh_t.cell_field
-
-# ╔═╡ 7a453df6-9187-4b9d-a223-b49461119f6f
-print(uh_t)
 
 # ╔═╡ 89204ee5-b7cb-4828-aed1-c625fab3d4fd
 Difference=sqrt(sum(∫(abs2(uh_t-uh)*Bulk)*dΩ)/sum(∫(abs2(uh_t)*Bulk)*dΩ))
@@ -295,9 +290,8 @@ html"""
 # ╠═5fb2241c-3bf0-4a02-8234-b165d6259c9c
 # ╟─5e790bdf-ab97-4fe4-9af5-3670474bb604
 # ╠═c5ad1c02-9d85-449b-83e8-2bb90a1a2a63
-# ╟─8cb354e5-448d-47c3-bb67-f5ac5992144d
 # ╠═cb384c0d-6e33-4d68-85e9-924ada655dda
-# ╠═9b0e27bf-a67d-45ae-8625-9915b67d05d2
+# ╟─8cb354e5-448d-47c3-bb67-f5ac5992144d
 # ╠═eb27ab8a-ad56-451f-9568-c97690e844ce
 # ╟─0ae4b233-3943-4ee4-b593-4f7bdd4dcdfa
 # ╠═542439b4-d337-4d9d-8323-089a8c33fe96
@@ -320,5 +314,4 @@ html"""
 # ╠═0de7404b-46bd-4462-b6f9-413a86cde6a2
 # ╠═918fcc72-bf9a-43e7-b13a-7ce76738767c
 # ╠═75193c36-91cc-4582-a5b3-d8992eff2484
-# ╠═90e93b81-d929-4b83-8e17-546d45a201bb
 # ╠═be59001e-b529-49ff-beeb-d901d1bc11cb
