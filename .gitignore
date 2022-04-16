@@ -3,3 +3,4 @@ docs/build/
 *.cov
 coverage/
 .vscode/
+*.code-workspace
