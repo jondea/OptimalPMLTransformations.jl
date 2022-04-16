@@ -32,6 +32,7 @@ export polar_to_pml_coordinates,
 
 export optimal_pml_transformation
 
+export jacobian
 export tν
 export tν_jacobian
 export tν_and_jacobian
@@ -41,6 +42,8 @@ export tx_and_jacobian
 export tr
 export tr_jacobian
 export tr_and_jacobian
+
+export SFB
 
 export AbstractFieldFunction
 

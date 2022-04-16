@@ -11,6 +11,9 @@ struct PMLGeometryDerivatives{T<:Real}
     d3x_dtν3::SVector{Complex{T}}
 end
 
+"Return the thickness of the PML"
+pml_thickness(geom) = geom.δ
+
 include("annular_pml.jl")
 
 include("x_aligned_pml.jl")

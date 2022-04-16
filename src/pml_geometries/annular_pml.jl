@@ -23,8 +23,8 @@ end
 
 import Base: convert
 function Base.convert(::Type{PMLCoordinates}, c::PolarCoordinates, pml::AnnularPML)
-    R = pml.R; δ = pml.δ
-    PMLCoordinates{1}((r-R)/δ, (θ,))
+    R = pml.R; δ = pml.δ; r = c.r; θ = c.θ
+    PMLCoordinates((r-R)/δ, (θ,))
 end
 function Base.convert(::Type{PolarCoordinates}, c::PMLCoordinates, pml::AnnularPML)
     ν = c.ν; ζ = c.ζ
