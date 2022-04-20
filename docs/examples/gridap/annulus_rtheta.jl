@@ -56,6 +56,9 @@ r_c = 1.0          # Radius of the cylinder
 # ╔═╡ 034816e3-8e5b-4409-b52b-e06fe8cd2933
 δ_pml = 1.0      # Thickness of the PML
 
+# ╔═╡ 3a497c1e-633b-4fd8-bc8d-76c430776213
+N_H = 1          # Order of hankel function/angular fourier mode
+
 # ╔═╡ 85abed5a-5cd2-4b89-8928-07c8f48de368
 md"""
 ## Discrete Model
@@ -102,7 +105,7 @@ V = TestFESpace(model,reffe;conformity=:H1, dirichlet_tags=["boundary"], vector_
 md"We apply unit Dirichlet conditions on the inner cylinder, and zero Dirichlet conditions on the outer PML boundary."
 
 # ╔═╡ 13b018b6-3379-4c1b-9dca-a5157e9cd62b
-u_D(x) = (1.0 + 0.0im) * (x[1] < r_c*1.1)
+u_D(x) = exp(im*N_H*x[2]) * (x[1] < r_c*1.1)
 
 # ╔═╡ 58e98595-6015-44ef-8f20-f44cc954b2fe
 U = TrialFESpace(V,u_D)
@@ -171,13 +174,13 @@ md"""
 md"Value of hankel function at inner boundary, which we will use to normalise the field to be 1 at inner boundary."
 
 # ╔═╡ f625145b-5988-407f-8e9c-be47781ac941
-h0 = hankelh1(0,k*r_c)
+h0 = hankelh1(N_H,k*r_c)
 
 # ╔═╡ 6ce73844-b3f4-425b-b8d2-d23440e4b879
 md"Construct the analytical solution in finite element basis"
 
 # ╔═╡ 5a391731-d63e-44f2-a723-6e669d8f4341
-uh_t = CellField(x->hankelh1(0,k*x[1])/h0, Ω)
+uh_t = CellField(x->exp(im*N_H*x[2])*hankelh1(N_H,k*x[1])/h0, Ω)
 
 # ╔═╡ 3d6df51a-91af-427a-8847-9908e0b49980
 uh_t.cell_field
@@ -269,6 +272,7 @@ html"""
 # ╠═be580a34-c070-481c-ad6f-ffed29e6fc3b
 # ╠═3d2e2bff-4d55-42e6-8ff8-540be800dca0
 # ╠═034816e3-8e5b-4409-b52b-e06fe8cd2933
+# ╠═3a497c1e-633b-4fd8-bc8d-76c430776213
 # ╟─85abed5a-5cd2-4b89-8928-07c8f48de368
 # ╠═25f93e89-3c00-4e40-a7a0-93e0d8a8ce9b
 # ╠═12e2d719-c74a-4632-85d5-a8c253ba7ade
