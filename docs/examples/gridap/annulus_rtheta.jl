@@ -221,7 +221,19 @@ end
 a(u,v) = ∫( ( ((inv∘J)⋅(polarJ⋅∇(v)))⋅((inv∘J)⋅(polarJ⋅∇(u))) - (k^2*(v*u)) )*polarDet*(det∘J))*dΩ
 
 # ╔═╡ 709ed3be-b0f3-42b5-930b-a136c6803165
-op = AffineFEOperator(a,b,U,V)
+op = let
+    u = get_trial_fe_basis(U)
+    v = get_fe_basis(V)
+
+    uhd = zero(U)
+    matcontribs = a(u,v)
+    veccontribs = b(v)
+    data = collect_cell_matrix_and_vector(U,V,matcontribs,veccontribs,uhd)
+    A,b_vec = assemble_matrix_and_vector(assem,data)
+    #GC.gc()
+
+    AffineFEOperator(U,V,A,b_vec)
+end
 
 # ╔═╡ ad22f43c-64b9-4c17-92eb-0d9a8d264f4c
 uh = solve(op)
