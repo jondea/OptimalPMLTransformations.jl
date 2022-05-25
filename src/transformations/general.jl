@@ -22,6 +22,9 @@ function corrector(field_fnc::Function, U::Number, ν, tν0, field0=field_fnc(t�
     while normalised_f(field) > ε
         dtν = -f(field)/df(field)
 
+        if isnan(dtν)
+            error("dtν is nan, cannot continue")
+        end
         if householder_order == 1
             tν = tν + dtν
         elseif householder_order == 2
@@ -54,6 +57,14 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     # Last resort kill switch
     overall_iter = 0
+
+    if isnan(tν0)
+        error("tν0 is nan, cannot continue")
+    end
+
+    if isnan(ν0)
+        error("ν0 is nan, cannot continue")
+    end
 
     # Start with 0
     ν = ν0
@@ -101,6 +112,10 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     # Keep going until we get to our target
     while ν < ν_max
+
+        if isnan(h)
+            error("step (h) is nan, cannot continue stepping")
+        end
 
         # Last resort break to stop infinite loop
         overall_iter += 1
