@@ -1,30 +1,20 @@
 
 abstract type ConformalPML <: PMLGeometry end
 
-"Should return vector (preferrably SVector) which represents inner boundary of PML as function of ζ::AbstractVector"
-function inner_pml(::ConformalPML, ζ::Number)::SVector
-    throw(MethodError("All subtypes of ConformalPML must implement inner_pml"))
-end
+"Return vector (preferrably SVector) which represents inner boundary of PML as function of ζ::AbstractVector"
+function inner_pml(::ConformalPML, ζ::Number)::SVector end
 
-"Should return vector (preferrably SVector) which represents PML direction as function of ζ::AbstractVector"
-function pml_direction(::ConformalPML, ζ::Number)::SVector
-    throw(MethodError("All subtypes of ConformalPML must implement pml_direction"))
-end
+"Return vector (preferrably SVector) which represents PML direction as function of ζ::AbstractVector"
+function pml_direction(::ConformalPML, ζ::Number)::SVector end
 
-"Should return vector (preferrably SVector) which represents inner boundary of PML as function of ζ::AbstractVector"
-function inner_pml_deriv(::ConformalPML, ζ::Number)::SVector
-    throw(MethodError("All subtypes of ConformalPML must implement inner_pml"))
-end
+"Return vector (preferrably SVector) which represents inner boundary of PML as function of ζ::AbstractVector"
+function inner_pml_deriv(::ConformalPML, ζ::Number)::SVector end
 
-"Should return vector (preferrably SVector) which represents PML direction as function of ζ::AbstractVector"
-function pml_direction_deriv(::ConformalPML, ζ::Number)::SVector
-    throw(MethodError("All subtypes of ConformalPML must implement pml_direction"))
-end
+"Return vector (preferrably SVector) which represents PML direction as function of ζ::AbstractVector"
+function pml_direction_deriv(::ConformalPML, ζ::Number)::SVector end
 
-"Should map from x to ζ"
-function ζ_from_x(::ConformalPML, coords::SVector)::Number
-    throw(MethodError("All subtypes of ConformalPML must implement pml_direction"))
-end
+"Map from x to ζ"
+function ζ_from_x(::ConformalPML, coords::SVector)::Number end
 
 function (geom::ConformalPML)(::PMLGeometryDerivatives, coords::PMLCoordinates)
     ν = c.ν; ζ = c.ζ
