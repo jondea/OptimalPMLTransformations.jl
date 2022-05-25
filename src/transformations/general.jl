@@ -103,6 +103,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     tν_prev = tν
     ν_prev  = ν
 
+    # Could we do tν_jump_max as relative to abs(tν)?
     # Try to guess what will be a good size for the next step without going past our max
     h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
 
