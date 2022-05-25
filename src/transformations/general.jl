@@ -186,6 +186,20 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             # Reset stepsize, try to guess what will be a good size for the next step without going past our max
             h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν, 2*h_prev)
         else
+            # TODO: make these log at debug level
+            # print("Rejecting at $ν, reasons: ")
+            # if !(t_angle_jump <= t_angle_jump_max)
+            #     print("t_angle_jump too big: $t_angle_jump ")
+            # end
+            # if !(abs(tν-tν_prev) <= tν_jump_max)
+            #     print("abs(tν-tν_prev) too big: $(abs(tν-tν_prev)) ")
+            # end
+            # if !(converged)
+            #     print("not converged ")
+            # end
+
+            # println("")
+
             # Reject the step and reduce step size
             # Go back to previous
             ν  = ν_prev
