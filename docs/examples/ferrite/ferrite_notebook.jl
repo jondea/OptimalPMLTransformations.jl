@@ -31,17 +31,88 @@ R = 4.0
 # ╔═╡ 5504bcf5-924b-4c7d-8fbd-0458b5b5892b
 pml_δ = 1.0
 
+# ╔═╡ 5f59a261-e21a-4d1d-857a-429cc220f6c2
+δ_pml = pml_δ
+
+# ╔═╡ 6e5f6ba3-6def-42be-8a54-3e54d24d902f
+N_θ = 8
+
+# ╔═╡ 5810d1fe-0355-466a-a917-4b590042d364
+N_r = 4
+
+# ╔═╡ 8ac284f0-7116-411a-aeb9-09061e74422f
+N_pml = 3
+
 # ╔═╡ af73f242-133c-41cd-883a-4a4a3cba52a0
 cylinder_radius = 1.0
 
 # ╔═╡ 6bcd6d30-3a54-4e34-bbdf-a2b177368905
 # const ∇ = Tensors.gradient
 
+# ╔═╡ ea410c14-d99b-4d12-a3a1-086529ea213b
+reshape([Node((x,y)) for x in 0:0.2:1, y in 0:0.5:3],:)
+
+# ╔═╡ c323e48f-d5ea-4a4f-8827-b3fc6e163cd0
+skipfirst(v) = v[begin+1:end]
+
+# ╔═╡ ab4ff9e7-e92c-4319-bb31-adea87fb16e5
+flatten(v) = reshape(v,:)
+
+# ╔═╡ fd51903f-662c-4fec-bb8b-da705e20f360
+reshape(1:6, (2,3))
+
 # ╔═╡ 1071b515-29e3-4abf-a4c9-33890d37f571
 # const Δ = Tensors.hessian;
+# Modify this to be generic in order, with a stretching and hard code the periodicity
+# QuadraticQuadrilateral
+function generate_pml_grid(::Type{QuadraticQuadrilateral}, N_θ, N_r, N_pml, r_inner, R, δ_pml)
+    ncell_x = (N_r + N_pml)
+ 	ncell_y = N_θ
+	nodes_x = vcat(range(r_inner,R,length=2*N_r+1), skipfirst(range(R,R+δ_pml,length=2*N_pml+1)))
+	nodes_y = range(0,τ,length=2*N_θ+1)
+
+	# Generate nodes
+    nodes = [Node((x,y)) for x in nodes_x, y in nodes_y]
+
+	# Generate cells
+	node_idxs = reshape(1:length(nodes), size(nodes))
+    cells = [
+		QuadraticQuadrilateral(
+			(node_idxs[2*i-1,2*j-1], node_idxs[2*i+1,2*j-1], node_idxs[2*i+1,2*j+1],
+			 node_idxs[2*i-1,2*j+1], node_idxs[2*i  ,2*j-1], node_idxs[2*i+1,2*j],
+			 node_idxs[2*i,  2*j+1], node_idxs[2*i-1,2*j],   node_idxs[2*i  ,2*j]))
+		for j in 1:ncell_y, i in 1:ncell_x
+	]
+
+    # Cell faces
+	cell_idxs = reshape(1:length(cells), size(cells))
+	bottom_face = [FaceIndex(cl, 1) for cl in cell_idxs[:,    begin]]
+	right_face  = [FaceIndex(cl, 2) for cl in cell_idxs[end,  :    ]]
+	top_face    = [FaceIndex(cl, 3) for cl in cell_idxs[:,    end  ]]
+	left_face   = [FaceIndex(cl, 4) for cl in cell_idxs[begin,:    ]]
+
+	boundary = [bottom_face; right_face; top_face; left_face]
+    boundary_matrix = Ferrite.boundaries_to_sparse(boundary)
+
+    # Cell facesets
+    facesets = Dict{String, Set{FaceIndex}}(
+		"bottom" => Set{FaceIndex}(bottom_face),
+		"right"  => Set{FaceIndex}(right_face),
+		"top"    => Set{FaceIndex}(top_face),
+		"left"   => Set{FaceIndex}(left_face),
+	)
+
+    return Grid(flatten(cells), flatten(nodes); facesets, boundary_matrix)
+end
+
+# ╔═╡ 0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
+grid_pml = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
 
 # ╔═╡ 0aa48490-c2c9-4ed6-b60f-49c76d237b9c
 grid = generate_grid(Quadrilateral, (50, 50), Vec{2}((cylinder_radius,0.0)), Vec{2}((R+pml_δ,τ)))
+
+# ╔═╡ 00be45a6-881a-4bad-bd2c-d28a20bb95bc
+grid.nodes
 
 # ╔═╡ 713a5e7f-2200-466e-b5bc-6a18746e4a3e
 dim = 2
@@ -87,9 +158,14 @@ u_ana(n::Node) = u_ana(n.x)
 # ╔═╡ 53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 dbcs = let
 	dbcs = ConstraintHandler(dh;bctype=ComplexF64)
-	dbc = Dirichlet(:u, union(getfaceset(grid, "left"), getfaceset(grid, "bottom"), getfaceset(grid, "top"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
+
+    pdbc = PeriodicDirichlet(:u, ["bottom" => "top", "left" => "right"])
+    add!(dbcs, pdbc)
+
+    dbc = Dirichlet(:u, union(getfaceset(grid, "left"), getfaceset(grid, "right")), (x,t) -> u_ana(x))
 	add!(dbcs, dbc)
-	close!(dbcs)
+
+    close!(dbcs)
 	update!(dbcs, 0.0)
 	dbcs
 end
@@ -177,10 +253,20 @@ html"""
 # ╠═c194b0aa-1ecc-40e8-9193-e6147198bfc2
 # ╠═320885af-a850-4aa5-b8ad-371063acf39b
 # ╠═5504bcf5-924b-4c7d-8fbd-0458b5b5892b
+# ╠═5f59a261-e21a-4d1d-857a-429cc220f6c2
+# ╠═6e5f6ba3-6def-42be-8a54-3e54d24d902f
+# ╠═5810d1fe-0355-466a-a917-4b590042d364
+# ╠═8ac284f0-7116-411a-aeb9-09061e74422f
 # ╠═af73f242-133c-41cd-883a-4a4a3cba52a0
 # ╠═6bcd6d30-3a54-4e34-bbdf-a2b177368905
+# ╠═ea410c14-d99b-4d12-a3a1-086529ea213b
+# ╠═c323e48f-d5ea-4a4f-8827-b3fc6e163cd0
+# ╠═ab4ff9e7-e92c-4319-bb31-adea87fb16e5
+# ╠═fd51903f-662c-4fec-bb8b-da705e20f360
 # ╠═1071b515-29e3-4abf-a4c9-33890d37f571
+# ╠═0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 # ╠═0aa48490-c2c9-4ed6-b60f-49c76d237b9c
+# ╠═00be45a6-881a-4bad-bd2c-d28a20bb95bc
 # ╠═713a5e7f-2200-466e-b5bc-6a18746e4a3e
 # ╠═97120304-9920-42f3-a0b4-0ee6f71457f7
 # ╠═768d2be4-85e3-4015-9955-fa1682c8fd90
