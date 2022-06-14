@@ -35,8 +35,10 @@ pml_δ = 1.0
 # ╔═╡ 5f59a261-e21a-4d1d-857a-429cc220f6c2
 δ_pml = pml_δ
 
-# ╔═╡ 6e5f6ba3-6def-42be-8a54-3e54d24d902f
+# ╔═╡ af5bb610-1c5d-479e-a7d2-318d134ccdd2
 resolution = 10
+
+# ╔═╡ fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
 N_θ = 5*resolution
 
 # ╔═╡ 5810d1fe-0355-466a-a917-4b590042d364
@@ -187,9 +189,10 @@ function u_ana(x::Vec{2, T}) where {T}
     return hankelh1(n_h, k*r) * exp(im*n_h*θ)
 end
 
-# ╔═╡ 291b0883-2a04-4dee-bd75-e7553d42f0ec
+# ╔═╡ 70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
 u_ana(n::Node) = u_ana(n.x)
 
+# ╔═╡ a8c8a3f2-64a9-4f88-abb9-fef16629fc01
 function get_nodes_on_face(dh::DofHandler, fi::FaceIndex)
     (cellidx, faceidx) = fi
     _celldofs = celldofs!(dh, cellidx) # extract the dofs for this cell
@@ -197,12 +200,14 @@ function get_nodes_on_face(dh::DofHandler, fi::FaceIndex)
     _celldofs[local_face_dofs[r]]
 end
 
+# ╔═╡ 9186fcfa-dc52-4d1d-b78a-5cc427cce54b
 # Extend to covr dh with multiple fields
 function nodedof(dh::DofHandler, cell_idx::Int, node_idx)
     # @assert isclosed(dh)
     return dh.cell_dofs[dh.cell_dofs_offset[cell_idx] + node_idx - 1]
 end
 
+# ╔═╡ ccb73afd-3fad-421f-a53a-7abd9b376835
 Base.@kwdef mutable struct PeriodicNodeMatch
     # Coordinate along the face for the two nodes
     face_coord::Float64
@@ -212,6 +217,7 @@ Base.@kwdef mutable struct PeriodicNodeMatch
     free_dof_index::Int = -1
 end
 
+# ╔═╡ 0de42268-ee05-45fa-89d3-e7f211382eff
 function insert_constrained!(v::Vector{PeriodicNodeMatch}, face_coord, constrained_dof_index)
     i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
     if i <= length(v) && v[i].face_coord ≈ face_coord
@@ -223,6 +229,7 @@ function insert_constrained!(v::Vector{PeriodicNodeMatch}, face_coord, constrain
     end
 end
 
+# ╔═╡ 9a99bf43-380d-4893-97a3-6d633910f689
 function insert_free!(v::Vector{PeriodicNodeMatch}, face_coord, free_dof_index)
     i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
     if i <= length(v) && v[i].face_coord ≈ face_coord
@@ -234,13 +241,16 @@ function insert_free!(v::Vector{PeriodicNodeMatch}, face_coord, free_dof_index)
     end
 end
 
+# ╔═╡ a483d040-f041-4644-9960-c96ac7c4edc6
 function node_indices(interpolation, fi::FaceIndex)
     face_idx = fi.idx[2]
     return Ferrite.faces(interpolation)[face_idx]
 end
 
+# ╔═╡ 64f6f318-d9ea-444b-8b68-a15895619335
 getnode(grid, cell_idx, node_idx) = grid.nodes[grid.cells[cell_idx].nodes[node_idx]]
 
+# ╔═╡ 8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
 function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing)
 
     if isnothing(field_name) && length(ch.dh.field_names) == 1
@@ -282,7 +292,6 @@ function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, f
     return ch
 end
 
-
 # ╔═╡ 53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 ch = let
 	ch = ConstraintHandler(dh)
@@ -301,26 +310,6 @@ ch = let
 	ch
 end
 
-
-# ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
-function dof_to_coord_dict(dh::DofHandler)
-    global_dofs = zeros(Int, ndofs_per_cell(dh))
-    dof_to_node = Dict{Int,Vec{2, Float64}}()
-    for cell in CellIterator(dh)
-        coords = getcoordinates(cell)
-        celldofs!(global_dofs, cell)
-        for (global_dof, coord) in zip(global_dofs, coords)
-            dof_to_node[global_dof] = coord
-        end
-    end
-    dof_to_node
-end
-
-function plot_dof_numbers!(dh::DofHandler)
-    for (dof, node) in dof_to_coord_dict(dh)
-        GLMakie.text!([string(dof)], position = [(node[1], node[2])])
-    end
-end
 
 # ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
 function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
@@ -380,7 +369,7 @@ u = let
 	u
 end
 
-# ╔═╡ 592b59d6-9fbf-4b6a-a6df-553ed40082b4
+# ╔═╡ 1dfc1298-18b7-4c54-b1a1-fa598b13f527
 let
 	vtkfile = vtk_grid("helmholtz", dh)
 	vtk_point_data(vtkfile, dh, real.(u), "_real")
@@ -393,13 +382,38 @@ let
 	vtk_save(vtkfile)
 end
 
+# ╔═╡ a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
 function plot_u(fnc=real)
     plotter = FerriteViz.MakiePlotter(dh,fnc.(u))
     FerriteViz.surface(plotter,field=:u)
 end
 
-FerriteViz.wireframe(grid,markersize=5,strokewidth=1,celllabels=true,facelabels=true)
-plot_dof_numbers!(dh)
+# ╔═╡ e06b65c2-0300-4bf5-8aa7-0784eef693e5
+function dof_to_coord_dict(dh::DofHandler)
+    global_dofs = zeros(Int, ndofs_per_cell(dh))
+    dof_to_node = Dict{Int,Vec{2, Float64}}()
+    for cell in CellIterator(dh)
+        coords = getcoordinates(cell)
+        celldofs!(global_dofs, cell)
+        for (global_dof, coord) in zip(global_dofs, coords)
+            dof_to_node[global_dof] = coord
+        end
+    end
+    dof_to_node
+end
+
+# ╔═╡ 546e64db-90cb-44a6-a22b-b59791ba36f7
+function plot_dof_numbers!(dh::DofHandler)
+    for (dof, node) in dof_to_coord_dict(dh)
+        GLMakie.text!([string(dof)], position = [(node[1], node[2])])
+    end
+end
+
+# ╔═╡ 291dbeb9-42f7-403b-8225-90f2ae98952a
+let
+	FerriteViz.wireframe(grid,markersize=5,strokewidth=1,celllabels=true,facelabels=true)
+	plot_dof_numbers!(dh)
+end
 
 # ╔═╡ b5b526dd-37ef-484c-97fd-2305f0d1d714
 html"""
@@ -417,7 +431,8 @@ html"""
 # ╠═320885af-a850-4aa5-b8ad-371063acf39b
 # ╠═5504bcf5-924b-4c7d-8fbd-0458b5b5892b
 # ╠═5f59a261-e21a-4d1d-857a-429cc220f6c2
-# ╠═6e5f6ba3-6def-42be-8a54-3e54d24d902f
+# ╠═af5bb610-1c5d-479e-a7d2-318d134ccdd2
+# ╠═fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
 # ╠═5810d1fe-0355-466a-a917-4b590042d364
 # ╠═8ac284f0-7116-411a-aeb9-09061e74422f
 # ╠═af73f242-133c-41cd-883a-4a4a3cba52a0
@@ -440,9 +455,21 @@ html"""
 # ╠═401cd067-650b-4a86-bf69-6dc202128b47
 # ╠═c3b9a58a-f191-4a0d-8e1d-dc595de23421
 # ╠═f25ba6a8-cd2f-4f19-8203-979229345386
-# ╠═291b0883-2a04-4dee-bd75-e7553d42f0ec
+# ╠═70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
+# ╠═a8c8a3f2-64a9-4f88-abb9-fef16629fc01
+# ╠═9186fcfa-dc52-4d1d-b78a-5cc427cce54b
+# ╠═ccb73afd-3fad-421f-a53a-7abd9b376835
+# ╠═0de42268-ee05-45fa-89d3-e7f211382eff
+# ╠═9a99bf43-380d-4893-97a3-6d633910f689
+# ╠═a483d040-f041-4644-9960-c96ac7c4edc6
+# ╠═64f6f318-d9ea-444b-8b68-a15895619335
+# ╠═8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
 # ╠═53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
 # ╠═05f429a6-ac35-4a90-a45e-8803c7f1692a
-# ╠═592b59d6-9fbf-4b6a-a6df-553ed40082b4
+# ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
+# ╠═a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
+# ╠═e06b65c2-0300-4bf5-8aa7-0784eef693e5
+# ╠═546e64db-90cb-44a6-a22b-b59791ba36f7
+# ╠═291dbeb9-42f7-403b-8225-90f2ae98952a
 # ╠═b5b526dd-37ef-484c-97fd-2305f0d1d714
