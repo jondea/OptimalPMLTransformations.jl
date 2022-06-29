@@ -80,6 +80,12 @@ u_ana(n::Node) = u_ana(n.x)
 # ╔═╡ 314553e9-5c69-4da3-97b0-6287baf20e82
 pml = SFB(AnnularPML(R, δ_pml),k)
 
+# ╔═╡ 608866e5-c10e-4ac1-a120-303869e95c31
+in_pml(x::Vec{2}) = x[1] >= R
+
+# ╔═╡ 37eb008f-65fb-42b1-8bd2-14827c6e1e68
+in_pml(n::Node) = in_pml(n.x)
+
 # ╔═╡ 97120304-9920-42f3-a0b4-0ee6f71457f7
 ip = Lagrange{dim, RefCube, 2}()
 
@@ -163,10 +169,54 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         assemble!(assembler, global_dofs, fe, Ke)
     end
     return K, f
-end;
+end
 
 # ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 md"## Solve and plot"
+
+# ╔═╡ 1d32861b-8af5-4f0b-b928-7e6d47c3665a
+
+
+# ╔═╡ b9801fdf-6d31-48a1-9837-219199e0f326
+md"## Error measure"
+
+# ╔═╡ 668229dd-ee6e-4d3d-ad87-d3363ffbff47
+function integrate_solution(f::Function, u::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler)  where {dim}
+    T = dof_type(dh)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    global_dofs = zeros(Int, ndofs_per_cell(dh))
+
+	integral = zero(f(first(u), first(dh.grid.nodes).x))
+	
+    @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
+        coords = getcoordinates(cell)
+
+        reinit!(cellvalues, cell)
+        celldofs!(global_dofs, cell)
+		u_local = u[global_dofs]
+		for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+            r = coords_qp[1]
+            θ = coords_qp[2]
+
+			# How to get u? 
+			# Should we use the PointEvalIterator? Or would interating over that be O(n^2)
+			# We could use the get global dofs function and construct manually using shape function?
+
+			# Turn this into a function so we can do a sum reduction rather than a loop?
+			u_qp = zero(dof_type(dh))
+			for j in 1:n_basefuncs
+				u_qp += u_local[j] * shape_value(cellvalues, q_point, j)
+			end
+
+			integral += f(u_qp, coords_qp) * r * dΩ
+        end
+
+    end
+    return integral
+end
 
 # ╔═╡ 27d3071a-722e-4c0d-98b9-cd04d7c7980a
 md"# Appendix"
@@ -245,6 +295,20 @@ md"## Plot utils"
 function dof_to_coord_dict(dh::DofHandler)
     global_dofs = zeros(Int, ndofs_per_cell(dh))
     dof_to_node = Dict{Int,Vec{2, Float64}}()
+    for cell in CellIterator(dh)
+        coords = getcoordinates(cell)
+        celldofs!(global_dofs, cell)
+        for (global_dof, coord) in zip(global_dofs, coords)
+            dof_to_node[global_dof] = coord
+        end
+    end
+    dof_to_node
+end
+
+# ╔═╡ b02e42a2-a1e0-46be-b70e-c4d0212c2f14
+function dof_to_coord(dh::DofHandler)
+    global_dofs = zeros(Int, ndofs_per_cell(dh))
+    dof_to_node = Vector{Vec{2, Float64}}(undef, dh.ndofs.x)
     for cell in CellIterator(dh)
         coords = getcoordinates(cell)
         celldofs!(global_dofs, cell)
@@ -390,6 +454,10 @@ function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, f
             end
         end
 
+		# Remove the corners because they seem to break the apply! function if applied to the same node as a Dirichlet condition. They shouldn't really though...
+		face_coord_extrema = extrema(m->m.face_coord, matches)
+		filter!(m->m.face_coord ∉ face_coord_extrema, matches)
+
         for match in matches
             if match.constrained_dof_index < 1 || match.free_dof_index < 1
                 warning("Invalid dof index for ", match)
@@ -399,6 +467,9 @@ function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, f
     end
     return ch
 end
+
+# ╔═╡ 291e754a-68d4-42fc-a19e-5ae7bdaa64bb
+dof_coords = dof_to_coord(dh)
 
 # ╔═╡ 53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 ch = let
@@ -429,10 +500,10 @@ u = let
 	# We should be able to remove this at some point
 	K = create_sparsity_pattern(dh, ch)
 	K, f = doassemble(cellvalues, facevalues, K, dh)
-    # I think the affine contraint handler might be broken... something to do with global => localdofs
 	# Or should AffineConstraints be efined in terms of dof number not node id?
     apply!(K, f, ch)
 	u = K \ f
+	apply!(u, ch)
 	u
 end
 
@@ -442,8 +513,9 @@ let
 	vtk_point_data(vtkfile, dh, real.(u), "_real")
 	vtk_point_data(vtkfile, dh, imag.(u), "_imag")
 	# Can't seem to get these to output the cells in the right order...
-    u_ana_nodes = u_ana.(dh.grid.nodes)
-    vtk_point_data(vtkfile, dh, first.(getcoordinates.(dh.grid.nodes)), "_r")
+	dof_coords = dof_to_coord(dh)
+    u_ana_nodes = u_ana.(dof_coords)
+    vtk_point_data(vtkfile, dh, first.(dof_coords), "_r")
     vtk_point_data(vtkfile, dh, real.(u_ana_nodes), "_exact_real")
 	vtk_point_data(vtkfile, dh, imag.(u_ana_nodes), "_exact_imag")
 	vtk_save(vtkfile)
@@ -454,6 +526,15 @@ function plot_u(fnc=real)
     plotter = FerriteViz.MakiePlotter(dh,fnc.(u))
     FerriteViz.surface(plotter,field=:u)
 end
+
+# ╔═╡ 0e84a686-6e8f-456c-88c7-1af049e4da96
+abs_sq_error = integrate_solution((u,x)-> in_pml(x) ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
+
+# ╔═╡ 65b019eb-d01b-4810-991c-59ce48cfe416
+abs_sq_norm = integrate_solution((u,x)-> in_pml(x) ? 0.0 : abs(u)^2, u, cellvalues, dh)
+
+# ╔═╡ 339eba6b-be42-4691-a402-ae7ca53e17c6
+rel_error = sqrt(abs_sq_error/abs_sq_norm)
 
 # ╔═╡ 291dbeb9-42f7-403b-8225-90f2ae98952a
 function plot_dof_numbers(dh::DofHandler)
@@ -494,6 +575,8 @@ md"## Dependencies"
 # ╠═6ba2449f-ad24-44d0-a551-38f7c1d88f6b
 # ╠═70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
 # ╠═314553e9-5c69-4da3-97b0-6287baf20e82
+# ╠═608866e5-c10e-4ac1-a120-303869e95c31
+# ╠═37eb008f-65fb-42b1-8bd2-14827c6e1e68
 # ╠═0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 # ╠═97120304-9920-42f3-a0b4-0ee6f71457f7
 # ╠═768d2be4-85e3-4015-9955-fa1682c8fd90
@@ -508,8 +591,14 @@ md"## Dependencies"
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
 # ╟─8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 # ╠═05f429a6-ac35-4a90-a45e-8803c7f1692a
+# ╠═1d32861b-8af5-4f0b-b928-7e6d47c3665a
 # ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
 # ╠═a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
+# ╟─b9801fdf-6d31-48a1-9837-219199e0f326
+# ╠═668229dd-ee6e-4d3d-ad87-d3363ffbff47
+# ╠═0e84a686-6e8f-456c-88c7-1af049e4da96
+# ╠═65b019eb-d01b-4810-991c-59ce48cfe416
+# ╠═339eba6b-be42-4691-a402-ae7ca53e17c6
 # ╟─27d3071a-722e-4c0d-98b9-cd04d7c7980a
 # ╟─f9ac9aff-6a1c-41af-8389-b5d6dda301a3
 # ╠═a8c8a3f2-64a9-4f88-abb9-fef16629fc01
@@ -524,7 +613,9 @@ md"## Dependencies"
 # ╠═1071b515-29e3-4abf-a4c9-33890d37f571
 # ╠═0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
 # ╟─2eadb933-6d6f-4029-be05-a0df950fd705
+# ╠═291e754a-68d4-42fc-a19e-5ae7bdaa64bb
 # ╠═e06b65c2-0300-4bf5-8aa7-0784eef693e5
+# ╠═b02e42a2-a1e0-46be-b70e-c4d0212c2f14
 # ╠═546e64db-90cb-44a6-a22b-b59791ba36f7
 # ╠═291dbeb9-42f7-403b-8225-90f2ae98952a
 # ╟─9cfd1f97-f333-40a7-98db-cb9373a857a0
