@@ -110,14 +110,14 @@ md"## Assembly"
 # ╔═╡ 82e06944-aab0-4486-adc5-7b6b9c7d1275
 function J_pml(r, θ)
 	if r <= R
-		return Tensors.Tensor{2,2,ComplexF64}([
+		return r, Tensors.Tensor{2,2,ComplexF64}([
         1.0+0.0im 0;
         0 1
     ])
 	else
 		rθ = PolarCoordinates(r, θ)
 		tr, j = tr_and_jacobian(pml, rθ)
-		return Tensors.Tensor{2,2,ComplexF64}(j)
+		return tr, Tensors.Tensor{2,2,ComplexF64}(j)
 	end
 end
 
@@ -148,19 +148,19 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
             coords_qp = spatial_coordinate(cellvalues, q_point, coords)
             r = coords_qp[1]
             θ = coords_qp[2]
-            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/r])
-			J_pml_ = J_pml(r,θ)
+			tr, J_pml_ = J_pml(r,θ)
+            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
             Jₜᵣᵣ = inv(J_pml_)
 			detJₜᵣᵣ	= det(J_pml_)
 			f_true = zero(T)
             for i in 1:n_basefuncs
                 δu = shape_value(cellvalues, q_point, i)
                 ∇δu = shape_gradient(cellvalues, q_point, i)
-                fe[i] += (δu * f_true) * r * dΩ
+                fe[i] += (δu * f_true) * tr * dΩ
                 for j in 1:n_basefuncs
                     u = shape_value(cellvalues, q_point, j)
                     ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u) * r * detJₜᵣᵣ * dΩ
+                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u) * tr * detJₜᵣᵣ * dΩ
                 end
             end
         end
@@ -479,8 +479,6 @@ ch = let
 
 	gridfaceset(s) = getfaceset(grid, s)
 	
-    # pdbc = PeriodicDirichlet(:u, ["bottom" => "top"])
-	# add!(ch, pdbc)
     add_periodic!(ch, [gridfaceset("bottom")=>gridfaceset("top")], x->x[1])
 
     inner_dbc = Dirichlet(:u, gridfaceset("left"), u_ana)
