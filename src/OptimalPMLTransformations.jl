@@ -54,6 +54,7 @@ export PlanarWave
 export SingleAngularFourierMode,
        single_hankel_mode,
        single_angular_fourier_mode
+export InvHankelPML
 
 export HankelSeries,
        two_mode_pole_coef,

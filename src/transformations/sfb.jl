@@ -13,20 +13,32 @@ tν = -im/k*log(1-ν/δ)
 ```
 where `δ` is the PML thickness.
 """
-struct SFB{G <: PMLGeometry}
+struct SFB{G <: PMLGeometry, T}
     "Geometry of the PML"
     geom::G
     "Wavenumber of the equation/field"
-    k::Float64
+    k::T
 end
 
 function tν(t::SFB, coords::PMLCoordinates)
     ν, k, δ = coords.ν, t.k, pml_thickness(t.geom)
+    T = typeof(-im/k*log(1-ν/δ))
+    if ν <= 0
+        return T(ν)
+    elseif ν >= 1
+        return T(NaN)
+    end
     return -im/k*log(1-ν/δ)
 end
 
 function ∂tν_∂ν(t::SFB, coords::PMLCoordinates)
     ν, k, δ = coords.ν, t.k, pml_thickness(t.geom)
+    T = typeof(im/(k*δ)/(1-ν))
+    if ν <= 0
+        return T(1)
+    elseif ν >= 1
+        return T(NaN+NaN*im)
+    end
     return im/(k*δ)/(1-ν)
 end
 
