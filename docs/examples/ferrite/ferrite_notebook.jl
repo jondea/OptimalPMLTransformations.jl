@@ -18,13 +18,16 @@ begin
     using SparseArrays
 	using SpecialFunctions
     using LinearAlgebra
-	using OptimalPMLTransformations
+	# using OptimalPMLTransformations
 	using StaticArrays
     import FerriteViz, GLMakie
 end
 
 # ╔═╡ c80b6d31-ba85-4d8a-bc28-20dde3f74985
 @revise using Ferrite
+
+# ╔═╡ b3e4776d-8d03-47c2-8057-8b6e4f443b90
+@revise using OptimalPMLTransformations
 
 # ╔═╡ 4c152d80-c523-4da1-9035-7d7b4cb144d9
 md"# PML Helmholtz equation in annulus in polar coordinates"
@@ -48,7 +51,7 @@ pml_δ = 1.0
 resolution = 10
 
 # ╔═╡ fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
-N_θ = 5*resolution
+N_θ = 1*resolution
 
 # ╔═╡ 5810d1fe-0355-466a-a917-4b590042d364
 N_r = 3*resolution
@@ -63,7 +66,7 @@ cylinder_radius = 1.0
 dim = 2
 
 # ╔═╡ c3b9a58a-f191-4a0d-8e1d-dc595de23421
-n_h = 3
+n_h = 0
 
 # ╔═╡ f25ba6a8-cd2f-4f19-8203-979229345386
 function u_ana(x::Vec{2, T}) where {T}
@@ -77,8 +80,12 @@ u_ana(x::Vec{2}, _t::Number) = u_ana(x)
 # ╔═╡ 70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
 u_ana(n::Node) = u_ana(n.x)
 
+# ╔═╡ 3e1884b6-271d-4abe-88df-2d37cf28a4c4
+pml_geom = AnnularPML(R, δ_pml)
+
 # ╔═╡ 314553e9-5c69-4da3-97b0-6287baf20e82
-pml = SFB(AnnularPML(R, δ_pml),k)
+# pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+pml = SFB(pml_geom, k)
 
 # ╔═╡ 608866e5-c10e-4ac1-a120-303869e95c31
 in_pml(x::Vec{2}) = x[1] >= R
@@ -109,16 +116,9 @@ md"## Assembly"
 
 # ╔═╡ 82e06944-aab0-4486-adc5-7b6b9c7d1275
 function J_pml(r, θ)
-	if r <= R
-		return r, Tensors.Tensor{2,2,ComplexF64}([
-        1.0+0.0im 0;
-        0 1
-    ])
-	else
-		rθ = PolarCoordinates(r, θ)
-		tr, j = tr_and_jacobian(pml, rθ)
-		return tr, Tensors.Tensor{2,2,ComplexF64}(j)
-	end
+	rθ = PolarCoordinates(r, θ)
+	tr, j = tr_and_jacobian(pml, rθ)
+	return tr, Tensors.Tensor{2,2,ComplexF64}(j)
 end
 
 
@@ -137,34 +137,53 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
     fe = zeros(T, n_basefuncs) # Local force vector
     Ke = zeros(T, n_basefuncs, n_basefuncs) # Local stiffness mastrix
 
-    @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
+    for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
         coords = getcoordinates(cell)
-
-        reinit!(cellvalues, cell)
-		for q_point in 1:getnquadpoints(cellvalues)
-            dΩ = getdetJdV(cellvalues, q_point)
-            coords_qp = spatial_coordinate(cellvalues, q_point, coords)
-            r = coords_qp[1]
-            θ = coords_qp[2]
-			tr, J_pml_ = J_pml(r,θ)
-            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
-            Jₜᵣᵣ = inv(J_pml_)
-			detJₜᵣᵣ	= det(J_pml_)
-			f_true = zero(T)
-            for i in 1:n_basefuncs
-                δu = shape_value(cellvalues, q_point, i)
-                ∇δu = shape_gradient(cellvalues, q_point, i)
-                fe[i] += (δu * f_true) * tr * dΩ
-                for j in 1:n_basefuncs
-                    u = shape_value(cellvalues, q_point, j)
-                    ∇u = shape_gradient(cellvalues, q_point, j)
-                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u) * tr * detJₜᵣᵣ * dΩ
-                end
-            end
-        end
-
+		if in_pml(mean(coords))
+			reinit!(cellvalues, cell)
+			for q_point in 1:getnquadpoints(cellvalues)
+	            dΩ = getdetJdV(cellvalues, q_point)
+	            coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+	            r = coords_qp[1]
+	            θ = coords_qp[2]
+				tr, J_pml_ = J_pml(r,θ)
+	            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
+	            Jₜᵣᵣ = inv(J_pml_)
+				detJₜᵣᵣ	= det(J_pml_)
+				f_true = zero(T)
+	            for i in 1:n_basefuncs
+	                δu = shape_value(cellvalues, q_point, i)
+	                ∇δu = shape_gradient(cellvalues, q_point, i)
+	                fe[i] += (δu * f_true) * tr * dΩ
+	                for j in 1:n_basefuncs
+	                    u = shape_value(cellvalues, q_point, j)
+	                    ∇u = shape_gradient(cellvalues, q_point, j)
+	                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u
+										) * tr * detJₜᵣᵣ * dΩ
+	                end
+	            end
+	        end
+		else
+			# Bulk
+			reinit!(cellvalues, cell)
+			for q_point in 1:getnquadpoints(cellvalues)
+	            dΩ = getdetJdV(cellvalues, q_point)
+				coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+	            r = coords_qp[1]
+	            for i in 1:n_basefuncs
+	                δu = shape_value(cellvalues, q_point, i)
+	                ∇δu = shape_gradient(cellvalues, q_point, i)
+	                for j in 1:n_basefuncs
+	                    u = shape_value(cellvalues, q_point, j)
+	                    ∇u = shape_gradient(cellvalues, q_point, j)
+	                    Ke[i, j] += (∇δu⋅∇u - k^2*δu * u) * r * dΩ
+	                end
+	            end
+	        end
+		end
+	
         celldofs!(global_dofs, cell)
         assemble!(assembler, global_dofs, fe, Ke)
     end
@@ -174,8 +193,8 @@ end
 # ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 md"## Solve and plot"
 
-# ╔═╡ 1d32861b-8af5-4f0b-b928-7e6d47c3665a
-
+# ╔═╡ eec574a2-f6d0-479c-a47e-11f18dba82da
+tv = Tensors.Vec{2, Float64}[Tensors.Vec{2, Float64}((1.7, 0.0)), Tensors.Vec{2, Float64}(([1.8, 0.0]))]
 
 # ╔═╡ b9801fdf-6d31-48a1-9837-219199e0f326
 md"## Error measure"
@@ -188,7 +207,7 @@ function integrate_solution(f::Function, u::Vector, cellvalues::CellScalarValues
     global_dofs = zeros(Int, ndofs_per_cell(dh))
 
 	integral = zero(f(first(u), first(dh.grid.nodes).x))
-	
+
     @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
         coords = getcoordinates(cell)
 
@@ -201,7 +220,7 @@ function integrate_solution(f::Function, u::Vector, cellvalues::CellScalarValues
             r = coords_qp[1]
             θ = coords_qp[2]
 
-			# How to get u? 
+			# How to get u?
 			# Should we use the PointEvalIterator? Or would interating over that be O(n^2)
 			# We could use the get global dofs function and construct manually using shape function?
 
@@ -281,6 +300,52 @@ end
 
 # ╔═╡ 64f6f318-d9ea-444b-8b68-a15895619335
 getnode(grid, cell_idx, node_idx) = grid.nodes[grid.cells[cell_idx].nodes[node_idx]]
+
+# ╔═╡ 8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
+function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing)
+
+    if isnothing(field_name) && length(ch.dh.field_names) == 1
+        field_idx = 1
+    else
+        field_idx = Ferrite.find_field(ch.dh, field_name)
+    end
+    interpolation = Ferrite.getfieldinterpolation(ch.dh, field_idx)
+
+    for f_to_c_faceset in free_to_constrained_facesets
+        free_faceset, constrained_faceset = f_to_c_faceset
+
+        matches = Vector{PeriodicNodeMatch}()
+        for free_face in free_faceset
+            cell_idx = free_face.idx[1]
+            for node_idx in node_indices(interpolation, free_face)
+                coord = getnode(ch.dh.grid, cell_idx, node_idx).x
+                free_dof_index = nodedof(ch.dh, cell_idx, node_idx)
+                insert_free!(matches, global_to_face_coord(coord), free_dof_index)
+            end
+        end
+
+        for constrained_face in constrained_faceset
+            cell_idx = constrained_face.idx[1]
+            for node_idx in node_indices(interpolation, constrained_face)
+                coord = getnode(ch.dh.grid, cell_idx, node_idx).x
+                constrained_dof_index = nodedof(ch.dh, cell_idx, node_idx)
+                insert_constrained!(matches, global_to_face_coord(coord), constrained_dof_index)
+            end
+        end
+
+		# Remove the corners because they seem to break the apply! function if applied to the same node as a Dirichlet condition. They shouldn't really though...
+		face_coord_extrema = extrema(m->m.face_coord, matches)
+		filter!(m->m.face_coord ∉ face_coord_extrema, matches)
+
+        for match in matches
+            if match.constrained_dof_index < 1 || match.free_dof_index < 1
+                warning("Invalid dof index for ", match)
+            end
+            add!(ch, AffineConstraint(match.constrained_dof_index, [match.free_dof_index=>1.0], 0.0))
+        end
+    end
+    return ch
+end
 
 # ╔═╡ 424b9b91-9926-4c54-9f9d-329c974a8336
 md"## Grid generation"
@@ -414,77 +479,18 @@ end
 # ╔═╡ 0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 grid, periodic_constraints = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
 
-# ╔═╡ fa126b60-a706-4159-bbfc-39bff0a6929d
-dh = let
-	dh = DofHandler(ComplexF64, grid)
-	push!(dh, :u, 1)
-	close!(dh)
-	dh
-end
-
-# ╔═╡ 8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
-function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing)
-
-    if isnothing(field_name) && length(ch.dh.field_names) == 1
-        field_idx = 1
-    else
-        field_idx = Ferrite.find_field(ch.dh, field_name)
-    end
-    interpolation = Ferrite.getfieldinterpolation(ch.dh, field_idx)
-
-    for f_to_c_faceset in free_to_constrained_facesets
-        free_faceset, constrained_faceset = f_to_c_faceset
-
-        matches = Vector{PeriodicNodeMatch}()
-        for free_face in free_faceset
-            cell_idx = free_face.idx[1]
-            for node_idx in node_indices(interpolation, free_face)
-                coord = getnode(dh.grid, cell_idx, node_idx).x
-                free_dof_index = nodedof(dh, cell_idx, node_idx)
-                insert_free!(matches, global_to_face_coord(coord), free_dof_index)
-            end
-        end
-
-        for constrained_face in constrained_faceset
-            cell_idx = constrained_face.idx[1]
-            for node_idx in node_indices(interpolation, constrained_face)
-                coord = getnode(dh.grid, cell_idx, node_idx).x
-                constrained_dof_index = nodedof(dh, cell_idx, node_idx)
-                insert_constrained!(matches, global_to_face_coord(coord), constrained_dof_index)
-            end
-        end
-
-		# Remove the corners because they seem to break the apply! function if applied to the same node as a Dirichlet condition. They shouldn't really though...
-		face_coord_extrema = extrema(m->m.face_coord, matches)
-		filter!(m->m.face_coord ∉ face_coord_extrema, matches)
-
-        for match in matches
-            if match.constrained_dof_index < 1 || match.free_dof_index < 1
-                warning("Invalid dof index for ", match)
-            end
-            add!(ch, AffineConstraint(match.constrained_dof_index, [match.free_dof_index=>1.0], 0.0))
-        end
-    end
-    return ch
-end
-
-# ╔═╡ 291e754a-68d4-42fc-a19e-5ae7bdaa64bb
-dof_coords = dof_to_coord(dh)
-
 # ╔═╡ 53ae2bac-59b3-44e6-9d6c-53a18567ea2f
-ch = let
+function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right_bc)
 	ch = ConstraintHandler(dh)
 
-    Ferrite.getfaceset(grid::Grid, faceset_names::Vector{<:AbstractString}) = union(getfaceset.(Ref(grid), faceset_names)...)
-
 	gridfaceset(s) = getfaceset(grid, s)
-	
+
     add_periodic!(ch, [gridfaceset("bottom")=>gridfaceset("top")], x->x[1])
 
-    inner_dbc = Dirichlet(:u, gridfaceset("left"), u_ana)
+    inner_dbc = Dirichlet(:u, gridfaceset("left"), left_bc)
 	add!(ch, inner_dbc)
 
-	outer_dbc = Dirichlet(:u, gridfaceset("right"), (x,t)->zero(ComplexF64))
+	outer_dbc = Dirichlet(:u, gridfaceset("right"), right_bc)
 	add!(ch, outer_dbc)
 
     close!(ch)
@@ -492,9 +498,18 @@ ch = let
 	ch
 end
 
+# ╔═╡ 7b7a469a-01a4-4bd4-8d8a-d35f4db70a3c
+dh = let
+	dh = DofHandler(ComplexF64, grid)
+	push!(dh, :u, 1)
+	close!(dh)
+	dh
+end
 
 # ╔═╡ 05f429a6-ac35-4a90-a45e-8803c7f1692a
 u = let
+	ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
+	
 	# We should be able to remove this at some point
 	K = create_sparsity_pattern(dh, ch)
 	K, f = doassemble(cellvalues, facevalues, K, dh)
@@ -534,6 +549,9 @@ abs_sq_norm = integrate_solution((u,x)-> in_pml(x) ? 0.0 : abs(u)^2, u, cellvalu
 # ╔═╡ 339eba6b-be42-4691-a402-ae7ca53e17c6
 rel_error = sqrt(abs_sq_error/abs_sq_norm)
 
+# ╔═╡ 291e754a-68d4-42fc-a19e-5ae7bdaa64bb
+dof_coords = dof_to_coord(dh)
+
 # ╔═╡ 291dbeb9-42f7-403b-8225-90f2ae98952a
 function plot_dof_numbers(dh::DofHandler)
 	FerriteViz.wireframe(grid,markersize=5,strokewidth=1,celllabels=true,facelabels=true)
@@ -572,6 +590,7 @@ md"## Dependencies"
 # ╠═f25ba6a8-cd2f-4f19-8203-979229345386
 # ╠═6ba2449f-ad24-44d0-a551-38f7c1d88f6b
 # ╠═70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
+# ╠═3e1884b6-271d-4abe-88df-2d37cf28a4c4
 # ╠═314553e9-5c69-4da3-97b0-6287baf20e82
 # ╠═608866e5-c10e-4ac1-a120-303869e95c31
 # ╠═37eb008f-65fb-42b1-8bd2-14827c6e1e68
@@ -581,15 +600,15 @@ md"## Dependencies"
 # ╠═2f7b496d-bb59-4631-8533-5754e9541109
 # ╠═dd572d4c-d1c5-44d6-9dcb-8742100d29f5
 # ╠═4b68a4cf-3276-42d8-abf2-3dd7a9000899
-# ╠═fa126b60-a706-4159-bbfc-39bff0a6929d
 # ╟─0d050dc4-0b97-4a0c-b399-970e1f7284c9
 # ╠═53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 # ╟─30826935-619b-460a-afc2-872950052f7a
 # ╠═82e06944-aab0-4486-adc5-7b6b9c7d1275
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
 # ╟─8296d8a7-41ce-4111-9564-05e7cdc4bfe8
+# ╠═eec574a2-f6d0-479c-a47e-11f18dba82da
+# ╠═7b7a469a-01a4-4bd4-8d8a-d35f4db70a3c
 # ╠═05f429a6-ac35-4a90-a45e-8803c7f1692a
-# ╠═1d32861b-8af5-4f0b-b928-7e6d47c3665a
 # ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
 # ╠═a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
 # ╟─b9801fdf-6d31-48a1-9837-219199e0f326
@@ -624,3 +643,4 @@ md"## Dependencies"
 # ╟─45be7b0b-c64d-4cfe-a399-de62e6b9094e
 # ╠═a51bf9fd-11a6-48ba-9b0d-ab4397be015c
 # ╠═c80b6d31-ba85-4d8a-bc28-20dde3f74985
+# ╠═b3e4776d-8d03-47c2-8057-8b6e4f443b90
