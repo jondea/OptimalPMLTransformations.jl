@@ -99,11 +99,17 @@ ip = Lagrange{dim, RefCube, 2}()
 # ╔═╡ 768d2be4-85e3-4015-9955-fa1682c8fd90
 qr = QuadratureRule{dim, RefCube}(4)
 
+# ╔═╡ d688875d-12f6-491a-89a2-1c346dc26acf
+pml_qr = QuadratureRule{dim, RefCube}(8)
+
 # ╔═╡ 2f7b496d-bb59-4631-8533-5754e9541109
 qr_face = QuadratureRule{dim-1, RefCube}(4)
 
 # ╔═╡ dd572d4c-d1c5-44d6-9dcb-8742100d29f5
 cellvalues = CellScalarValues(qr, ip);
+
+# ╔═╡ e680ed8b-e054-47d2-87b4-ab25c15063a3
+pml_cellvalues = CellScalarValues(pml_qr, ip);
 
 # ╔═╡ 4b68a4cf-3276-42d8-abf2-3dd7a9000899
 facevalues = FaceScalarValues(qr_face, ip);
@@ -123,7 +129,7 @@ end
 
 
 # ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
-function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
+function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScalarValues{dim},
                          K::SparseMatrixCSC, dh::DofHandler) where {dim}
     b = 1.0
     T = dof_type(dh)
@@ -142,10 +148,10 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
         fill!(fe, 0)
         coords = getcoordinates(cell)
 		if in_pml(mean(coords))
-			reinit!(cellvalues, cell)
-			for q_point in 1:getnquadpoints(cellvalues)
-	            dΩ = getdetJdV(cellvalues, q_point)
-	            coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+			reinit!(pml_cellvalues, cell)
+			for q_point in 1:getnquadpoints(pml_cellvalues)
+	            dΩ = getdetJdV(pml_cellvalues, q_point)
+	            coords_qp = spatial_coordinate(pml_cellvalues, q_point, coords)
 	            r = coords_qp[1]
 	            θ = coords_qp[2]
 				tr, J_pml_ = J_pml(r,θ)
@@ -154,12 +160,12 @@ function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarVal
 				detJₜᵣᵣ	= det(J_pml_)
 				f_true = zero(T)
 	            for i in 1:n_basefuncs
-	                δu = shape_value(cellvalues, q_point, i)
-	                ∇δu = shape_gradient(cellvalues, q_point, i)
+	                δu = shape_value(pml_cellvalues, q_point, i)
+	                ∇δu = shape_gradient(pml_cellvalues, q_point, i)
 	                fe[i] += (δu * f_true) * tr * dΩ
 	                for j in 1:n_basefuncs
-	                    u = shape_value(cellvalues, q_point, j)
-	                    ∇u = shape_gradient(cellvalues, q_point, j)
+	                    u = shape_value(pml_cellvalues, q_point, j)
+	                    ∇u = shape_gradient(pml_cellvalues, q_point, j)
 	                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u
 										) * tr * detJₜᵣᵣ * dΩ
 	                end
@@ -512,7 +518,7 @@ u = let
 	
 	# We should be able to remove this at some point
 	K = create_sparsity_pattern(dh, ch)
-	K, f = doassemble(cellvalues, facevalues, K, dh)
+	K, f = doassemble(cellvalues, pml_cellvalues, K, dh)
 	# Or should AffineConstraints be efined in terms of dof number not node id?
     apply!(K, f, ch)
 	u = K \ f
@@ -597,8 +603,10 @@ md"## Dependencies"
 # ╠═0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 # ╠═97120304-9920-42f3-a0b4-0ee6f71457f7
 # ╠═768d2be4-85e3-4015-9955-fa1682c8fd90
+# ╠═d688875d-12f6-491a-89a2-1c346dc26acf
 # ╠═2f7b496d-bb59-4631-8533-5754e9541109
 # ╠═dd572d4c-d1c5-44d6-9dcb-8742100d29f5
+# ╠═e680ed8b-e054-47d2-87b4-ab25c15063a3
 # ╠═4b68a4cf-3276-42d8-abf2-3dd7a9000899
 # ╟─0d050dc4-0b97-4a0c-b399-970e1f7284c9
 # ╠═53ae2bac-59b3-44e6-9d6c-53a18567ea2f
