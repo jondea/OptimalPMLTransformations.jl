@@ -48,7 +48,7 @@ pml_δ = 1.0
 δ_pml = pml_δ
 
 # ╔═╡ af5bb610-1c5d-479e-a7d2-318d134ccdd2
-resolution = 10
+resolution = 20
 
 # ╔═╡ fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
 N_θ = 1*resolution
@@ -84,8 +84,8 @@ u_ana(n::Node) = u_ana(n.x)
 pml_geom = AnnularPML(R, δ_pml)
 
 # ╔═╡ 314553e9-5c69-4da3-97b0-6287baf20e82
-# pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-pml = SFB(pml_geom, k)
+pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+# pml = SFB(pml_geom, k)
 
 # ╔═╡ 608866e5-c10e-4ac1-a120-303869e95c31
 in_pml(x::Vec{2}) = x[1] >= R
@@ -99,17 +99,11 @@ ip = Lagrange{dim, RefCube, 2}()
 # ╔═╡ 768d2be4-85e3-4015-9955-fa1682c8fd90
 qr = QuadratureRule{dim, RefCube}(4)
 
-# ╔═╡ d688875d-12f6-491a-89a2-1c346dc26acf
-pml_qr = QuadratureRule{dim, RefCube}(8)
-
 # ╔═╡ 2f7b496d-bb59-4631-8533-5754e9541109
 qr_face = QuadratureRule{dim-1, RefCube}(4)
 
 # ╔═╡ dd572d4c-d1c5-44d6-9dcb-8742100d29f5
 cellvalues = CellScalarValues(qr, ip);
-
-# ╔═╡ e680ed8b-e054-47d2-87b4-ab25c15063a3
-pml_cellvalues = CellScalarValues(pml_qr, ip);
 
 # ╔═╡ 4b68a4cf-3276-42d8-abf2-3dd7a9000899
 facevalues = FaceScalarValues(qr_face, ip);
@@ -198,9 +192,6 @@ end
 
 # ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 md"## Solve and plot"
-
-# ╔═╡ eec574a2-f6d0-479c-a47e-11f18dba82da
-tv = Tensors.Vec{2, Float64}[Tensors.Vec{2, Float64}((1.7, 0.0)), Tensors.Vec{2, Float64}(([1.8, 0.0]))]
 
 # ╔═╡ b9801fdf-6d31-48a1-9837-219199e0f326
 md"## Error measure"
@@ -406,6 +397,25 @@ skipfirst(v) = v[begin+1:end]
 # ╔═╡ ab4ff9e7-e92c-4319-bb31-adea87fb16e5
 flatten(v) = reshape(v,:)
 
+# ╔═╡ 7938b996-d11c-4ebb-bd3e-b37ab7f74f12
+# signature should be: (::Ferrite.QuadratureRule{2,G})(order_x, order_y) where {G}
+# but I can't seem to get it to dispatch...
+function anisotropic_quadrature(G::Type{Ferrite.RefCube}, order_x, order_y)
+	T = Float64
+	qx = QuadratureRule{1,G}(order_x)
+	qy = QuadratureRule{1,G}(order_y)
+	weights = flatten(getweights(qx) .* getweights(qy)')
+	points = flatten([Tensors.Vec(x[1],y[1]) for x in getpoints(qx), y in getpoints(qy)])	
+	return QuadratureRule{2,G,T}(weights, points)
+end
+
+# ╔═╡ d688875d-12f6-491a-89a2-1c346dc26acf
+# pml_qr = QuadratureRule{dim, RefCube}(8)
+pml_qr = anisotropic_quadrature(RefCube, 4, 4)
+
+# ╔═╡ e680ed8b-e054-47d2-87b4-ab25c15063a3
+pml_cellvalues = CellScalarValues(pml_qr, ip);
+
 # ╔═╡ 1071b515-29e3-4abf-a4c9-33890d37f571
 # Modify this to be generic in order, with a stretching and hard code the periodicity
 # QuadraticQuadrilateral
@@ -602,6 +612,7 @@ md"## Dependencies"
 # ╠═37eb008f-65fb-42b1-8bd2-14827c6e1e68
 # ╠═0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 # ╠═97120304-9920-42f3-a0b4-0ee6f71457f7
+# ╠═7938b996-d11c-4ebb-bd3e-b37ab7f74f12
 # ╠═768d2be4-85e3-4015-9955-fa1682c8fd90
 # ╠═d688875d-12f6-491a-89a2-1c346dc26acf
 # ╠═2f7b496d-bb59-4631-8533-5754e9541109
@@ -614,7 +625,6 @@ md"## Dependencies"
 # ╠═82e06944-aab0-4486-adc5-7b6b9c7d1275
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
 # ╟─8296d8a7-41ce-4111-9564-05e7cdc4bfe8
-# ╠═eec574a2-f6d0-479c-a47e-11f18dba82da
 # ╠═7b7a469a-01a4-4bd4-8d8a-d35f4db70a3c
 # ╠═05f429a6-ac35-4a90-a45e-8803c7f1692a
 # ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
