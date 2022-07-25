@@ -173,9 +173,6 @@ getnode(grid, cell_idx, node_idx) = grid.nodes[grid.cells[cell_idx].nodes[node_i
 # ╔═╡ 424b9b91-9926-4c54-9f9d-329c974a8336
 md"## Grid generation"
 
-# ╔═╡ 0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
-equality_constraint(free_node_id::Int, constrained_node_id::Int) = AffineConstraint(constrained_node_id, [free_node_id=>1.0+0.0im], 0.0im)
-
 # ╔═╡ 7325361c-5d7c-4ddd-bd0f-493b88872f78
 md"## Ferrite utils"
 
@@ -251,7 +248,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScala
 	            end
 	        end
 		end
-	
+
         celldofs!(global_dofs, cell)
         assemble!(assembler, global_dofs, fe, Ke)
     end
@@ -489,23 +486,16 @@ function generate_pml_grid(::Type{QuadraticQuadrilateral}, N_θ, N_r, N_pml, r_i
     addfaceset!(grid, "top", ontop)
     addfaceset!(grid, "left", onleft)
 
-    # addedgeset!(grid, "bottom", onbottom)
-    # addedgeset!(grid, "right", onright)
-    # addedgeset!(grid, "top", ontop)
-    # addedgeset!(grid, "left", onleft)
-
     addnodeset!(grid, "bottom", onbottom)
     addnodeset!(grid, "right", onright)
     addnodeset!(grid, "top", ontop)
     addnodeset!(grid, "left", onleft)
 
-    periodic_constraints = [equality_constraint(tn, bn) for (tn, bn) in zip(node_idxs[:,end], node_idxs[:,begin])][begin+1:end-1]
-
-    return grid, periodic_constraints
+    return grid
 end
 
 # ╔═╡ 0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
-grid, periodic_constraints = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
+grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
 
 # ╔═╡ 53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right_bc)
@@ -549,7 +539,7 @@ function anisotropic_quadrature(G::Type{Ferrite.RefCube}, order_x, order_y)
 	qx = QuadratureRule{1,G}(order_x)
 	qy = QuadratureRule{1,G}(order_y)
 	weights = flatten(getweights(qx) .* getweights(qy)')
-	points = flatten([Tensors.Vec(x[1],y[1]) for x in getpoints(qx), y in getpoints(qy)])	
+	points = flatten([Tensors.Vec(x[1],y[1]) for x in getpoints(qx), y in getpoints(qy)])
 	return QuadratureRule{2,G,T}(weights, points)
 end
 
@@ -652,7 +642,6 @@ md"## Dependencies"
 # ╠═8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
 # ╟─424b9b91-9926-4c54-9f9d-329c974a8336
 # ╠═1071b515-29e3-4abf-a4c9-33890d37f571
-# ╠═0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
 # ╟─7325361c-5d7c-4ddd-bd0f-493b88872f78
 # ╠═084c55e0-1400-44f0-9058-67c857d6ab12
 # ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
