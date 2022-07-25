@@ -1,0 +1,8 @@
+name = "PMLFerriteExtensions"
+uuid = "213a2d69-b566-4c17-a652-bf3a19db057b"
+authors = ["jondea <jondea@thedeakin.net>"]
+version = "0.1.0"
+
+[deps]
+Ferrite = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
+Tau = "c544e3c2-d3e5-5802-ac44-44683f340e4a"
