@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.5
+# v0.19.9
 
 using Markdown
 using InteractiveUtils
@@ -41,11 +41,8 @@ k = 2.0
 # ╔═╡ 320885af-a850-4aa5-b8ad-371063acf39b
 R = 4.0
 
-# ╔═╡ 5504bcf5-924b-4c7d-8fbd-0458b5b5892b
-pml_δ = 1.0
-
 # ╔═╡ 5f59a261-e21a-4d1d-857a-429cc220f6c2
-δ_pml = pml_δ
+δ_pml = 1.0
 
 # ╔═╡ af5bb610-1c5d-479e-a7d2-318d134ccdd2
 resolution = 20
@@ -80,12 +77,16 @@ u_ana(x::Vec{2}, _t::Number) = u_ana(x)
 # ╔═╡ 70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
 u_ana(n::Node) = u_ana(n.x)
 
-# ╔═╡ 3e1884b6-271d-4abe-88df-2d37cf28a4c4
-pml_geom = AnnularPML(R, δ_pml)
-
 # ╔═╡ 314553e9-5c69-4da3-97b0-6287baf20e82
+# pml = SFB(AnnularPML(R, δ_pml), k)
 pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-# pml = SFB(pml_geom, k)
+
+# ╔═╡ 82e06944-aab0-4486-adc5-7b6b9c7d1275
+function J_pml(r, θ)
+	rθ = PolarCoordinates(r, θ)
+	tr, j = tr_and_jacobian(pml, rθ)
+	return tr, Tensors.Tensor{2,2,ComplexF64}(j)
+end
 
 # ╔═╡ 608866e5-c10e-4ac1-a120-303869e95c31
 in_pml(x::Vec{2}) = x[1] >= R
@@ -114,13 +115,80 @@ md"## Constraints"
 # ╔═╡ 30826935-619b-460a-afc2-872950052f7a
 md"## Assembly"
 
-# ╔═╡ 82e06944-aab0-4486-adc5-7b6b9c7d1275
-function J_pml(r, θ)
-	rθ = PolarCoordinates(r, θ)
-	tr, j = tr_and_jacobian(pml, rθ)
-	return tr, Tensors.Tensor{2,2,ComplexF64}(j)
+# ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
+md"## Solve and plot"
+
+# ╔═╡ b9801fdf-6d31-48a1-9837-219199e0f326
+md"## Error measure"
+
+# ╔═╡ 27d3071a-722e-4c0d-98b9-cd04d7c7980a
+md"# Appendix"
+
+# ╔═╡ f9ac9aff-6a1c-41af-8389-b5d6dda301a3
+md"## Periodic Constraints"
+
+# ╔═╡ ccb73afd-3fad-421f-a53a-7abd9b376835
+Base.@kwdef mutable struct PeriodicNodeMatch
+    # Coordinate along the face for the two nodes
+    face_coord::Float64
+    # Index of the degree of freedom which we will constrain to be equal to the free dof
+    constrained_dof_index::Int = -1
+    # Index of the degree of freedom which will set the value of the constrined dof
+    free_dof_index::Int = -1
 end
 
+# ╔═╡ 0de42268-ee05-45fa-89d3-e7f211382eff
+function insert_constrained!(v::Vector{PeriodicNodeMatch}, face_coord, constrained_dof_index)
+    i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
+    if i <= length(v) && v[i].face_coord ≈ face_coord
+        v[i].constrained_dof_index = constrained_dof_index
+    elseif i > 1 && v[i-1].face_coord ≈ face_coord
+        v[i-1].constrained_dof_index = constrained_dof_index
+    else
+        insert!(v,i,PeriodicNodeMatch(;face_coord, constrained_dof_index))
+    end
+end
+
+# ╔═╡ 9a99bf43-380d-4893-97a3-6d633910f689
+function insert_free!(v::Vector{PeriodicNodeMatch}, face_coord, free_dof_index)
+    i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
+    if i <= length(v) && v[i].face_coord ≈ face_coord
+        v[i].free_dof_index = free_dof_index
+    elseif i > 1 && v[i-1].face_coord ≈ face_coord
+        v[i-1].free_dof_index = free_dof_index
+    else
+        insert!(v,i,PeriodicNodeMatch(;face_coord, free_dof_index))
+    end
+end
+
+# ╔═╡ a483d040-f041-4644-9960-c96ac7c4edc6
+function node_indices(interpolation, fi::FaceIndex)
+    face_idx = fi.idx[2]
+    return Ferrite.faces(interpolation)[face_idx]
+end
+
+# ╔═╡ 64f6f318-d9ea-444b-8b68-a15895619335
+getnode(grid, cell_idx, node_idx) = grid.nodes[grid.cells[cell_idx].nodes[node_idx]]
+
+# ╔═╡ 424b9b91-9926-4c54-9f9d-329c974a8336
+md"## Grid generation"
+
+# ╔═╡ 0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
+equality_constraint(free_node_id::Int, constrained_node_id::Int) = AffineConstraint(constrained_node_id, [free_node_id=>1.0+0.0im], 0.0im)
+
+# ╔═╡ 7325361c-5d7c-4ddd-bd0f-493b88872f78
+md"## Ferrite utils"
+
+# ╔═╡ 084c55e0-1400-44f0-9058-67c857d6ab12
+# Perhaps implement one with fields as a pair of symbols and ints
+function Ferrite.DofHandler(T::DataType, grid::Ferrite.AbstractGrid, fields::Array{Symbol})
+	dh = DofHandler(T, grid)
+	for field in fields
+		push!(dh, field, 1)
+	end
+	close!(dh)
+	dh
+end
 
 # ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
 function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScalarValues{dim},
@@ -190,11 +258,15 @@ function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScala
     return K, f
 end
 
-# ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
-md"## Solve and plot"
-
-# ╔═╡ b9801fdf-6d31-48a1-9837-219199e0f326
-md"## Error measure"
+# ╔═╡ d87c0552-eec5-4765-ad04-03fbab2727fe
+function solve(ch, cellvalues, pml_cellvalues)
+	K = create_sparsity_pattern(ch.dh, ch)
+	K, f = doassemble(cellvalues, pml_cellvalues, K, ch.dh)
+    apply!(K, f, ch)
+	u = K \ f
+	apply!(u, ch)
+	return u
+end
 
 # ╔═╡ 668229dd-ee6e-4d3d-ad87-d3363ffbff47
 function integrate_solution(f::Function, u::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler)  where {dim}
@@ -234,12 +306,6 @@ function integrate_solution(f::Function, u::Vector, cellvalues::CellScalarValues
     return integral
 end
 
-# ╔═╡ 27d3071a-722e-4c0d-98b9-cd04d7c7980a
-md"# Appendix"
-
-# ╔═╡ f9ac9aff-6a1c-41af-8389-b5d6dda301a3
-md"## Periodic Constraints"
-
 # ╔═╡ a8c8a3f2-64a9-4f88-abb9-fef16629fc01
 function get_nodes_on_face(dh::DofHandler, fi::FaceIndex)
     (cellidx, faceidx) = fi
@@ -254,49 +320,6 @@ function nodedof(dh::DofHandler, cell_idx::Int, node_idx)
     # @assert isclosed(dh)
     return dh.cell_dofs[dh.cell_dofs_offset[cell_idx] + node_idx - 1]
 end
-
-# ╔═╡ ccb73afd-3fad-421f-a53a-7abd9b376835
-Base.@kwdef mutable struct PeriodicNodeMatch
-    # Coordinate along the face for the two nodes
-    face_coord::Float64
-    # Index of the degree of freedom which we will constrain to be equal to the free dof
-    constrained_dof_index::Int = -1
-    # Index of the degree of freedom which will set the value of the constrined dof
-    free_dof_index::Int = -1
-end
-
-# ╔═╡ 0de42268-ee05-45fa-89d3-e7f211382eff
-function insert_constrained!(v::Vector{PeriodicNodeMatch}, face_coord, constrained_dof_index)
-    i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
-    if i <= length(v) && v[i].face_coord ≈ face_coord
-        v[i].constrained_dof_index = constrained_dof_index
-    elseif i > 1 && v[i-1].face_coord ≈ face_coord
-        v[i-1].constrained_dof_index = constrained_dof_index
-    else
-        insert!(v,i,PeriodicNodeMatch(;face_coord, constrained_dof_index))
-    end
-end
-
-# ╔═╡ 9a99bf43-380d-4893-97a3-6d633910f689
-function insert_free!(v::Vector{PeriodicNodeMatch}, face_coord, free_dof_index)
-    i = searchsortedfirst(v, PeriodicNodeMatch(;face_coord); by=m->m.face_coord)
-    if i <= length(v) && v[i].face_coord ≈ face_coord
-        v[i].free_dof_index = free_dof_index
-    elseif i > 1 && v[i-1].face_coord ≈ face_coord
-        v[i-1].free_dof_index = free_dof_index
-    else
-        insert!(v,i,PeriodicNodeMatch(;face_coord, free_dof_index))
-    end
-end
-
-# ╔═╡ a483d040-f041-4644-9960-c96ac7c4edc6
-function node_indices(interpolation, fi::FaceIndex)
-    face_idx = fi.idx[2]
-    return Ferrite.faces(interpolation)[face_idx]
-end
-
-# ╔═╡ 64f6f318-d9ea-444b-8b68-a15895619335
-getnode(grid, cell_idx, node_idx) = grid.nodes[grid.cells[cell_idx].nodes[node_idx]]
 
 # ╔═╡ 8087be43-3dc7-4a94-9a47-5ce5e2dcf5aa
 function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing)
@@ -344,12 +367,6 @@ function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, f
     return ch
 end
 
-# ╔═╡ 424b9b91-9926-4c54-9f9d-329c974a8336
-md"## Grid generation"
-
-# ╔═╡ 0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
-equality_constraint(free_node_id::Int, constrained_node_id::Int) = AffineConstraint(constrained_node_id, [free_node_id=>1.0+0.0im], 0.0im)
-
 # ╔═╡ 2eadb933-6d6f-4029-be05-a0df950fd705
 md"## Plot utils"
 
@@ -381,6 +398,20 @@ function dof_to_coord(dh::DofHandler)
     dof_to_node
 end
 
+# ╔═╡ 1dfc1298-18b7-4c54-b1a1-fa598b13f527
+function write_vtk(filename::String, dh::Ferrite.AbstractDofHandler, u::Vector{<:Complex}, u_ana=nothing)
+	vtkfile = vtk_grid(filename, dh)
+	vtk_point_data(vtkfile, dh, real.(u), "_real")
+	vtk_point_data(vtkfile, dh, imag.(u), "_imag")
+	if !isnothing(u_ana)
+		dof_coords = dof_to_coord(dh)
+	    u_ana_nodes = u_ana.(dof_coords)
+	    vtk_point_data(vtkfile, dh, real.(u_ana_nodes), "_exact_real")
+		vtk_point_data(vtkfile, dh, imag.(u_ana_nodes), "_exact_imag")
+	end
+	vtk_save(vtkfile)
+end
+
 # ╔═╡ 546e64db-90cb-44a6-a22b-b59791ba36f7
 function plot_dof_numbers!(dh::DofHandler)
     for (dof, node) in dof_to_coord_dict(dh)
@@ -396,25 +427,6 @@ skipfirst(v) = v[begin+1:end]
 
 # ╔═╡ ab4ff9e7-e92c-4319-bb31-adea87fb16e5
 flatten(v) = reshape(v,:)
-
-# ╔═╡ 7938b996-d11c-4ebb-bd3e-b37ab7f74f12
-# signature should be: (::Ferrite.QuadratureRule{2,G})(order_x, order_y) where {G}
-# but I can't seem to get it to dispatch...
-function anisotropic_quadrature(G::Type{Ferrite.RefCube}, order_x, order_y)
-	T = Float64
-	qx = QuadratureRule{1,G}(order_x)
-	qy = QuadratureRule{1,G}(order_y)
-	weights = flatten(getweights(qx) .* getweights(qy)')
-	points = flatten([Tensors.Vec(x[1],y[1]) for x in getpoints(qx), y in getpoints(qy)])	
-	return QuadratureRule{2,G,T}(weights, points)
-end
-
-# ╔═╡ d688875d-12f6-491a-89a2-1c346dc26acf
-# pml_qr = QuadratureRule{dim, RefCube}(8)
-pml_qr = anisotropic_quadrature(RefCube, 4, 4)
-
-# ╔═╡ e680ed8b-e054-47d2-87b4-ab25c15063a3
-pml_cellvalues = CellScalarValues(pml_qr, ip);
 
 # ╔═╡ 1071b515-29e3-4abf-a4c9-33890d37f571
 # Modify this to be generic in order, with a stretching and hard code the periodicity
@@ -515,40 +527,44 @@ function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right
 end
 
 # ╔═╡ 7b7a469a-01a4-4bd4-8d8a-d35f4db70a3c
-dh = let
-	dh = DofHandler(ComplexF64, grid)
-	push!(dh, :u, 1)
-	close!(dh)
-	dh
+dh = DofHandler(ComplexF64, grid, [:u])
+
+# ╔═╡ 28991803-729f-4265-a987-fb3a800e26be
+ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
+
+# ╔═╡ 291e754a-68d4-42fc-a19e-5ae7bdaa64bb
+dof_coords = dof_to_coord(dh)
+
+# ╔═╡ 291dbeb9-42f7-403b-8225-90f2ae98952a
+function plot_dof_numbers(dh::DofHandler)
+	FerriteViz.wireframe(grid,markersize=5,strokewidth=1,celllabels=true,facelabels=true)
+	plot_dof_numbers!(dh)
 end
+
+# ╔═╡ 7938b996-d11c-4ebb-bd3e-b37ab7f74f12
+# signature should be: (::Ferrite.QuadratureRule{2,G})(order_x, order_y) where {G}
+# but I can't seem to get it to dispatch...
+function anisotropic_quadrature(G::Type{Ferrite.RefCube}, order_x, order_y)
+	T = Float64
+	qx = QuadratureRule{1,G}(order_x)
+	qy = QuadratureRule{1,G}(order_y)
+	weights = flatten(getweights(qx) .* getweights(qy)')
+	points = flatten([Tensors.Vec(x[1],y[1]) for x in getpoints(qx), y in getpoints(qy)])	
+	return QuadratureRule{2,G,T}(weights, points)
+end
+
+# ╔═╡ d688875d-12f6-491a-89a2-1c346dc26acf
+# pml_qr = QuadratureRule{dim, RefCube}(8)
+pml_qr = anisotropic_quadrature(RefCube, 4, 4)
+
+# ╔═╡ e680ed8b-e054-47d2-87b4-ab25c15063a3
+pml_cellvalues = CellScalarValues(pml_qr, ip);
 
 # ╔═╡ 05f429a6-ac35-4a90-a45e-8803c7f1692a
-u = let
-	ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
-	
-	# We should be able to remove this at some point
-	K = create_sparsity_pattern(dh, ch)
-	K, f = doassemble(cellvalues, pml_cellvalues, K, dh)
-	# Or should AffineConstraints be efined in terms of dof number not node id?
-    apply!(K, f, ch)
-	u = K \ f
-	apply!(u, ch)
-	u
-end
+u = solve(ch, cellvalues, pml_cellvalues )
 
-# ╔═╡ 1dfc1298-18b7-4c54-b1a1-fa598b13f527
-let
-	vtkfile = vtk_grid("helmholtz", dh)
-	vtk_point_data(vtkfile, dh, real.(u), "_real")
-	vtk_point_data(vtkfile, dh, imag.(u), "_imag")
-	# Can't seem to get these to output the cells in the right order...
-	dof_coords = dof_to_coord(dh)
-    u_ana_nodes = u_ana.(dof_coords)
-    vtk_point_data(vtkfile, dh, first.(dof_coords), "_r")
-    vtk_point_data(vtkfile, dh, real.(u_ana_nodes), "_exact_real")
-	vtk_point_data(vtkfile, dh, imag.(u_ana_nodes), "_exact_imag")
-	vtk_save(vtkfile)
-end
+# ╔═╡ 20c98042-509d-49f0-b011-a45bba3a7dae
+write_vtk("helmholtz", dh, u, u_ana)
 
 # ╔═╡ a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
 function plot_u(fnc=real)
@@ -564,15 +580,6 @@ abs_sq_norm = integrate_solution((u,x)-> in_pml(x) ? 0.0 : abs(u)^2, u, cellvalu
 
 # ╔═╡ 339eba6b-be42-4691-a402-ae7ca53e17c6
 rel_error = sqrt(abs_sq_error/abs_sq_norm)
-
-# ╔═╡ 291e754a-68d4-42fc-a19e-5ae7bdaa64bb
-dof_coords = dof_to_coord(dh)
-
-# ╔═╡ 291dbeb9-42f7-403b-8225-90f2ae98952a
-function plot_dof_numbers(dh::DofHandler)
-	FerriteViz.wireframe(grid,markersize=5,strokewidth=1,celllabels=true,facelabels=true)
-	plot_dof_numbers!(dh)
-end
 
 # ╔═╡ b5b526dd-37ef-484c-97fd-2305f0d1d714
 html"""
@@ -594,7 +601,6 @@ md"## Dependencies"
 # ╟─1d9ac613-63c0-4c34-8c84-1af02a5f4172
 # ╠═c194b0aa-1ecc-40e8-9193-e6147198bfc2
 # ╠═320885af-a850-4aa5-b8ad-371063acf39b
-# ╠═5504bcf5-924b-4c7d-8fbd-0458b5b5892b
 # ╠═5f59a261-e21a-4d1d-857a-429cc220f6c2
 # ╠═af5bb610-1c5d-479e-a7d2-318d134ccdd2
 # ╠═fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
@@ -606,13 +612,12 @@ md"## Dependencies"
 # ╠═f25ba6a8-cd2f-4f19-8203-979229345386
 # ╠═6ba2449f-ad24-44d0-a551-38f7c1d88f6b
 # ╠═70efa29b-880c-4ac5-b9ef-4f3a84af9ab2
-# ╠═3e1884b6-271d-4abe-88df-2d37cf28a4c4
 # ╠═314553e9-5c69-4da3-97b0-6287baf20e82
+# ╠═82e06944-aab0-4486-adc5-7b6b9c7d1275
 # ╠═608866e5-c10e-4ac1-a120-303869e95c31
 # ╠═37eb008f-65fb-42b1-8bd2-14827c6e1e68
 # ╠═0e7cb220-a7c3-41b5-abcc-a2dcc9111ca1
 # ╠═97120304-9920-42f3-a0b4-0ee6f71457f7
-# ╠═7938b996-d11c-4ebb-bd3e-b37ab7f74f12
 # ╠═768d2be4-85e3-4015-9955-fa1682c8fd90
 # ╠═d688875d-12f6-491a-89a2-1c346dc26acf
 # ╠═2f7b496d-bb59-4631-8533-5754e9541109
@@ -622,12 +627,13 @@ md"## Dependencies"
 # ╟─0d050dc4-0b97-4a0c-b399-970e1f7284c9
 # ╠═53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 # ╟─30826935-619b-460a-afc2-872950052f7a
-# ╠═82e06944-aab0-4486-adc5-7b6b9c7d1275
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
 # ╟─8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 # ╠═7b7a469a-01a4-4bd4-8d8a-d35f4db70a3c
+# ╠═28991803-729f-4265-a987-fb3a800e26be
 # ╠═05f429a6-ac35-4a90-a45e-8803c7f1692a
-# ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
+# ╠═d87c0552-eec5-4765-ad04-03fbab2727fe
+# ╠═20c98042-509d-49f0-b011-a45bba3a7dae
 # ╠═a2c59a93-ed50-44ea-9e7b-8cb99b1f3afb
 # ╟─b9801fdf-6d31-48a1-9837-219199e0f326
 # ╠═668229dd-ee6e-4d3d-ad87-d3363ffbff47
@@ -647,6 +653,10 @@ md"## Dependencies"
 # ╟─424b9b91-9926-4c54-9f9d-329c974a8336
 # ╠═1071b515-29e3-4abf-a4c9-33890d37f571
 # ╠═0a6cf79e-d111-4f89-b3be-9e2ffc9b5558
+# ╟─7325361c-5d7c-4ddd-bd0f-493b88872f78
+# ╠═084c55e0-1400-44f0-9058-67c857d6ab12
+# ╠═1dfc1298-18b7-4c54-b1a1-fa598b13f527
+# ╠═7938b996-d11c-4ebb-bd3e-b37ab7f74f12
 # ╟─2eadb933-6d6f-4029-be05-a0df950fd705
 # ╠═291e754a-68d4-42fc-a19e-5ae7bdaa64bb
 # ╠═e06b65c2-0300-4bf5-8aa7-0784eef693e5
