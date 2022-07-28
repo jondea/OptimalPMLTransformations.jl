@@ -1,1 +1,4 @@
 #dev/
+
+# Temp julia folders
+jl_*/
