@@ -20,6 +20,8 @@ begin
     using LinearAlgebra
 	# using OptimalPMLTransformations
 	using StaticArrays
+	using ProgressMeter
+	import ProgressMeter: update!
     import FerriteViz, GLMakie
 end
 
@@ -116,7 +118,7 @@ function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right
 	add!(ch, outer_dbc)
 
     close!(ch)
-	update!(ch, 0.0)
+	Ferrite.update!(ch, 0.0)
 	ch
 end
 
@@ -261,7 +263,16 @@ function run_all()
 	N_pmls = [1, 2, 4, 8, 16, 32]
 	n_hs = [0, 3]
 	ks = [0.1, 1.0, 10.0]
-	[solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder) for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls]
+	@showprogress [solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder) for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls]
+
+	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,SFB,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
+	for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls
+		result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
+		open("$folder/result.csv", "a") do outfile
+			write(outfile, read("$result_folder/result.csv"))
+		end
+	end
+
 end
 
 # ╔═╡ 76070b3b-2663-481f-8deb-cf995bb9b640
