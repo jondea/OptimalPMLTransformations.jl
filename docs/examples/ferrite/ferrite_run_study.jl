@@ -23,6 +23,8 @@ begin
 	using ProgressMeter
 	import ProgressMeter: update!
     import FerriteViz, GLMakie
+    import CSV
+    using DataFrames
 end
 
 # ╔═╡ c80b6d31-ba85-4d8a-bc28-20dde3f74985
@@ -150,14 +152,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScala
 	            coords_qp = spatial_coordinate(pml_cellvalues, q_point, coords)
 	            r = coords_qp[1]
 	            θ = coords_qp[2]
-				# try
-				# 	tr_and_jacobian(pml, PolarCoordinates(r, θ))
-				# catch
-				# 	@show r, θ,k
-				# 	error()
-				# end
-					tr, J_ = tr_and_jacobian(pml, PolarCoordinates(r, θ))
-
+				tr, J_ = tr_and_jacobian(pml, PolarCoordinates(r, θ))
 				J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
 	            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
 	            Jₜᵣᵣ = inv(J_pml)
@@ -246,13 +241,21 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
 		end
 	end
 
-	# begin
-	# 	pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-	# 	(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
-	# 	open("$result_folder/result.csv","a") do f
-	# 		println(f, "$k,$N_pml,$n_h,InvHankel,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
-	# 	end
-	# end
+	begin
+		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
+		open("$result_folder/result.csv","a") do f
+			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel$n_h,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+		end
+	end
+
+    if n_h != 0
+		pml = InvHankelPML(;R, δ=δ_pml, k, m=0)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
+		open("$result_folder/result.csv","a") do f
+			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel0,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+		end
+	end
 end
 
 # ╔═╡ 4770eea5-ddab-4d98-90b9-4f95fec8a23e
@@ -265,7 +268,7 @@ function run_all()
 	ks = [0.1, 1.0, 10.0]
 	@showprogress [solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder) for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls]
 
-	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,SFB,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
+	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
 	for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls
 		result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
 		open("$folder/result.csv", "a") do outfile
@@ -273,10 +276,11 @@ function run_all()
 		end
 	end
 
+    CSV.read("$folder/result.csv", DataFrame)
 end
 
 # ╔═╡ 76070b3b-2663-481f-8deb-cf995bb9b640
-run_all()
+results_df = run_all()
 
 # ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 md"## Solve and plot"
