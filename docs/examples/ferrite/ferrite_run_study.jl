@@ -42,60 +42,6 @@ md"# PML Helmholtz equation in annulus in polar coordinates"
 # ╔═╡ 1d9ac613-63c0-4c34-8c84-1af02a5f4172
 md"## Parameters"
 
-# ╔═╡ d082cd6d-a8b8-4e25-ac5c-5c3b89ddb7e0
-
-
-# ╔═╡ c194b0aa-1ecc-40e8-9193-e6147198bfc2
-# k = 2.0
-
-# ╔═╡ 320885af-a850-4aa5-b8ad-371063acf39b
-# R = 4.0
-
-# ╔═╡ 5f59a261-e21a-4d1d-857a-429cc220f6c2
-# δ_pml = 1.0
-
-# ╔═╡ af5bb610-1c5d-479e-a7d2-318d134ccdd2
-resolution = 20
-
-# ╔═╡ 5810d1fe-0355-466a-a917-4b590042d364
-N_r = 3*resolution
-
-# ╔═╡ 8ac284f0-7116-411a-aeb9-09061e74422f
-N_pml = 3*resolution
-
-# ╔═╡ af73f242-133c-41cd-883a-4a4a3cba52a0
-cylinder_radius = 1.0
-
-# ╔═╡ 713a5e7f-2200-466e-b5bc-6a18746e4a3e
-# dim = 2
-
-# ╔═╡ c3b9a58a-f191-4a0d-8e1d-dc595de23421
-n_h = 1
-
-# ╔═╡ fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
-N_θ = max(n_h, 1)*resolution
-
-# ╔═╡ 759eb280-f138-46f8-af4e-7447a38c4a9f
-(f::SingleAngularFourierMode)(c::Node) = f(c.x)
-
-# ╔═╡ 424be202-5f13-46e1-a4db-8cbd6937fdcc
-(f::SingleAngularFourierMode)(x::Vec{2}, _t::Number) = f(x)
-
-# ╔═╡ ea07bf0c-552c-46fe-9431-4ca6a99e3647
-(f::SingleAngularFourierMode)(x::Vec{2}) = f(PolarCoordinates(x[1],x[2]))
-
-# ╔═╡ 691593a3-4e68-4b3c-8020-ee07bf773486
-Base.in(n::Node, pml::PMLGeometry) = in(n.x, pml)
-
-# ╔═╡ 8947ed4c-ac37-4531-9252-63b195b73577
-Base.in(x::Vec{2}, pml::AnnularPML) = x[1] >= pml.R
-
-# ╔═╡ 7fca1678-2d50-4ade-be8b-43430f751fcf
-Base.in(x, pml::SFB) = in(x, pml.geom)
-
-# ╔═╡ 04a4723c-c9d3-46cd-8d22-48b9c992f366
-Base.in(x, pml::InvHankelPML) = in(x, pml.geom)
-
 # ╔═╡ c75d6e53-ee17-4587-925c-f253705b633d
 # Single case for debugging
 # solve_and_save(;k=0.1, N_θ=3, N_r=1, N_pml=1, cylinder_radius=1.0, R=2.0, δ_pml=1.0, n_h=3, order=2, folder=tempname("./"))
@@ -124,6 +70,48 @@ end
 
 # ╔═╡ 30826935-619b-460a-afc2-872950052f7a
 md"## Assembly"
+
+# ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
+md"## Solve and plot"
+
+# ╔═╡ 27d3071a-722e-4c0d-98b9-cd04d7c7980a
+md"# Appendix"
+
+# ╔═╡ 9cfd1f97-f333-40a7-98db-cb9373a857a0
+md"## Utils"
+
+# ╔═╡ b5b526dd-37ef-484c-97fd-2305f0d1d714
+html"""
+<style>
+  main {
+    max-width: 900px;
+  }
+</style>
+"""
+
+# ╔═╡ 059eceb1-39fd-4a5e-a787-23d2bbf9b547
+PlutoUI.TableOfContents()
+
+# ╔═╡ 759eb280-f138-46f8-af4e-7447a38c4a9f
+(f::SingleAngularFourierMode)(c::Node) = f(c.x)
+
+# ╔═╡ 424be202-5f13-46e1-a4db-8cbd6937fdcc
+(f::SingleAngularFourierMode)(x::Vec{2}, _t::Number) = f(x)
+
+# ╔═╡ ea07bf0c-552c-46fe-9431-4ca6a99e3647
+(f::SingleAngularFourierMode)(x::Vec{2}) = f(PolarCoordinates(x[1],x[2]))
+
+# ╔═╡ 691593a3-4e68-4b3c-8020-ee07bf773486
+Base.in(n::Node, pml::PMLGeometry) = in(n.x, pml)
+
+# ╔═╡ 8947ed4c-ac37-4531-9252-63b195b73577
+Base.in(x::Vec{2}, pml::AnnularPML) = x[1] >= pml.R
+
+# ╔═╡ 7fca1678-2d50-4ade-be8b-43430f751fcf
+Base.in(x, pml::SFB) = in(x, pml.geom)
+
+# ╔═╡ 04a4723c-c9d3-46cd-8d22-48b9c992f366
+Base.in(x, pml::InvHankelPML) = in(x, pml.geom)
 
 # ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
 function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScalarValues{dim},
@@ -227,52 +215,68 @@ end
 # ╔═╡ ef1dac4e-77ea-47ef-a94a-bf63395120bc
 function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, n_h, order=2, folder)
 
-	qr=QuadratureRule{2, RefCube}(6)
-	pml_qr=QuadratureRule{2, RefCube}(6)
+	nqr_1d = 2*(order + 1)
+	qr=QuadratureRule{2, RefCube}(nqr_1d)
+	pml_qr=QuadratureRule{2, RefCube}(nqr_1d)
 	u_ana=single_hankel_mode(k,n_h)
 
 	result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
 	run(`mkdir -p $result_folder`)
 
-	begin
+	# SFB
+	let
 		pml = SFB(AnnularPML(R, δ_pml), k)
-		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, qr, pml_qr)
 		open("$result_folder/result.csv","a") do f
-			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,SFB,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,SFB,GL$(nqr_1d)x$(nqr_1d),$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
 		end
 	end
 
-	begin
+	# InvHankel n_h
+	let
 		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, qr, pml_qr)
 		open("$result_folder/result.csv","a") do f
-			println(f,"$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel$n_h,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+			println(f,"$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel$n_h,GL$(nqr_1d)x$(nqr_1d),$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
 		end
 	end
 
+	# InvHankel 0
     if n_h != 0
 		pml = InvHankelPML(;R, δ=δ_pml, k, m=0)
-		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, qr, pml_qr)
 		open("$result_folder/result.csv","a") do f
-			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel0,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel0,GL$(nqr_1d)x$(nqr_1d),$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
 		end
 	end
 
-	# Add one where we use InvHankel n_h with n_h, N_pml=1 and we ratchet up the quadrature through the PML.
-	# Also, add quadrature info to all results in csv
+	# InvHankel n_h with N_pml=1 and 
+	let
+		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+		aniso_pml_qr=anisotropic_quadrature(RefCube, N_pml*nqr_1d, nqr_1d)
+		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml=1, cylinder_radius, R, δ_pml, u_ana, order, pml, qr, pml_qr=aniso_pml_qr)
+		open("$result_folder/result.csv","a") do f
+			println(f,"$k,$n_h,$N_θ,$N_r,1,InvHankel$n_h,GL$(N_pml*nqr_1d)x$(nqr_1d),$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+		end
+	end
 end
 
 # ╔═╡ 4770eea5-ddab-4d98-90b9-4f95fec8a23e
-function run_all()
+function run_all(;test_run=false)
 	folder=tempname("./")
 
-	resolutions = [1, 2, 4, 8, 16, 32]
-	N_pmls = [1, 2, 4, 8, 16, 32]
+	if test_run
+		resolutions = [2, 8]
+		N_pmls = [1, 4]
+	else
+		resolutions = [1, 2, 4, 8, 16, 32]
+		N_pmls = [1, 2, 4, 8, 16, 32]
+	end
 	n_hs = [0, 3]
 	ks = [0.1, 1.0, 10.0]
 	@showprogress [solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder) for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls]
 
-	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
+	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
 	for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls
 		result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
 		open("$folder/result.csv", "a") do outfile
@@ -284,10 +288,10 @@ function run_all()
 end
 
 # ╔═╡ 76070b3b-2663-481f-8deb-cf995bb9b640
-results_df = run_all()
+results_df = run_all(test_run=true)
 
-# ╔═╡ 8296d8a7-41ce-4111-9564-05e7cdc4bfe8
-md"## Solve and plot"
+# ╔═╡ 1d6054f2-6ae5-4d09-8c7e-fe536512e3c6
+filter(r->r.N_pml == 1, results_df);
 
 # ╔═╡ d87c0552-eec5-4765-ad04-03fbab2727fe
 function solve(ch, cellvalues, pml_cellvalues)
@@ -299,49 +303,14 @@ function solve(ch, cellvalues, pml_cellvalues)
 	return u
 end
 
-# ╔═╡ 27d3071a-722e-4c0d-98b9-cd04d7c7980a
-md"# Appendix"
-
-# ╔═╡ 9cfd1f97-f333-40a7-98db-cb9373a857a0
-md"## Utils"
-
-# ╔═╡ b5b526dd-37ef-484c-97fd-2305f0d1d714
-html"""
-<style>
-  main {
-    max-width: 900px;
-  }
-</style>
-"""
-
-# ╔═╡ 059eceb1-39fd-4a5e-a787-23d2bbf9b547
-PlutoUI.TableOfContents()
-
 # ╔═╡ 45be7b0b-c64d-4cfe-a399-de62e6b9094e
 md"## Dependencies"
 
 # ╔═╡ Cell order:
 # ╟─4c152d80-c523-4da1-9035-7d7b4cb144d9
 # ╟─1d9ac613-63c0-4c34-8c84-1af02a5f4172
-# ╠═d082cd6d-a8b8-4e25-ac5c-5c3b89ddb7e0
-# ╠═c194b0aa-1ecc-40e8-9193-e6147198bfc2
-# ╠═320885af-a850-4aa5-b8ad-371063acf39b
-# ╠═5f59a261-e21a-4d1d-857a-429cc220f6c2
-# ╠═af5bb610-1c5d-479e-a7d2-318d134ccdd2
-# ╠═fc8b07d5-d035-45c3-ac0b-e7ea29f42bf0
-# ╠═5810d1fe-0355-466a-a917-4b590042d364
-# ╠═8ac284f0-7116-411a-aeb9-09061e74422f
-# ╠═af73f242-133c-41cd-883a-4a4a3cba52a0
-# ╠═713a5e7f-2200-466e-b5bc-6a18746e4a3e
-# ╠═c3b9a58a-f191-4a0d-8e1d-dc595de23421
-# ╠═759eb280-f138-46f8-af4e-7447a38c4a9f
-# ╠═424be202-5f13-46e1-a4db-8cbd6937fdcc
-# ╠═ea07bf0c-552c-46fe-9431-4ca6a99e3647
-# ╠═691593a3-4e68-4b3c-8020-ee07bf773486
-# ╠═8947ed4c-ac37-4531-9252-63b195b73577
-# ╠═7fca1678-2d50-4ade-be8b-43430f751fcf
-# ╠═04a4723c-c9d3-46cd-8d22-48b9c992f366
 # ╠═76070b3b-2663-481f-8deb-cf995bb9b640
+# ╠═1d6054f2-6ae5-4d09-8c7e-fe536512e3c6
 # ╠═c75d6e53-ee17-4587-925c-f253705b633d
 # ╠═4770eea5-ddab-4d98-90b9-4f95fec8a23e
 # ╠═5ec5d21a-3bcf-4cde-a814-f4fb71c30a2f
@@ -356,6 +325,13 @@ md"## Dependencies"
 # ╟─9cfd1f97-f333-40a7-98db-cb9373a857a0
 # ╠═b5b526dd-37ef-484c-97fd-2305f0d1d714
 # ╠═059eceb1-39fd-4a5e-a787-23d2bbf9b547
+# ╠═759eb280-f138-46f8-af4e-7447a38c4a9f
+# ╠═424be202-5f13-46e1-a4db-8cbd6937fdcc
+# ╠═ea07bf0c-552c-46fe-9431-4ca6a99e3647
+# ╠═691593a3-4e68-4b3c-8020-ee07bf773486
+# ╠═8947ed4c-ac37-4531-9252-63b195b73577
+# ╠═7fca1678-2d50-4ade-be8b-43430f751fcf
+# ╠═04a4723c-c9d3-46cd-8d22-48b9c992f366
 # ╟─45be7b0b-c64d-4cfe-a399-de62e6b9094e
 # ╠═a51bf9fd-11a6-48ba-9b0d-ab4397be015c
 # ╠═c80b6d31-ba85-4d8a-bc28-20dde3f74985
