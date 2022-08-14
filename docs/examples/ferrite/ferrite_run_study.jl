@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.19.11
 
 using Markdown
 using InteractiveUtils
@@ -96,11 +96,9 @@ Base.in(x, pml::SFB) = in(x, pml.geom)
 # ╔═╡ 04a4723c-c9d3-46cd-8d22-48b9c992f366
 Base.in(x, pml::InvHankelPML) = in(x, pml.geom)
 
-# ╔═╡ 614a288d-f6f7-499e-a141-33915a26d6d4
-
-
-# ╔═╡ 5956884c-62b8-4894-bb1b-b588d1721967
-# solve_and_save(;k=2.0, N_θ=20, N_r=20, N_pml=20, cylinder_radius=1.0, R=4.0, δ_pml=1.0, u_ana=single_hankel_mode(2.0,1), order=2, pml_type=SFB, qr=QuadratureRule{2, RefCube}(4), pml_qr=anisotropic_quadrature(RefCube, 4, 4))
+# ╔═╡ c75d6e53-ee17-4587-925c-f253705b633d
+# Single case for debugging
+# solve_and_save(;k=0.1, N_θ=3, N_r=1, N_pml=1, cylinder_radius=1.0, R=2.0, δ_pml=1.0, n_h=3, order=2, folder=tempname("./"))
 
 # ╔═╡ 0d050dc4-0b97-4a0c-b399-970e1f7284c9
 md"## Constraints"
@@ -196,30 +194,33 @@ end
 
 # ╔═╡ 5ec5d21a-3bcf-4cde-a814-f4fb71c30a2f
 function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, u_ana, order=2, pml, qr::QuadratureRule, pml_qr::QuadratureRule)
-
-	dim=2
-
-	ip = Lagrange{dim, RefCube, order}()
-	if order == 2
-		grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
-	else
-		error()
+	# Set to NaN initially in case we throw
+	(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = Iterators.cycle(NaN)
+	try
+		dim=2
+	
+		ip = Lagrange{dim, RefCube, order}()
+		if order == 2
+			grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
+		else
+			error()
+		end
+	
+		dh = DofHandler(ComplexF64, grid, [:u])
+		ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
+	
+		cellvalues = CellScalarValues(qr, ip);
+		pml_cellvalues = CellScalarValues(pml_qr, ip);
+		K = create_sparsity_pattern(ch.dh, ch)
+		assemble_time = @elapsed K, f = doassemble(cellvalues, pml_cellvalues, K, ch.dh, pml, k)
+	    apply!(K, f, ch)
+		solve_time = @elapsed u = K \ f
+		apply!(u, ch)
+		abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
+		abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
+		rel_error = sqrt(abs_sq_error/abs_sq_norm)
+	catch
 	end
-
-	dh = DofHandler(ComplexF64, grid, [:u])
-	ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
-
-	cellvalues = CellScalarValues(qr, ip);
-	pml_cellvalues = CellScalarValues(pml_qr, ip);
-	K = create_sparsity_pattern(ch.dh, ch)
-	assemble_time = @elapsed K, f = doassemble(cellvalues, pml_cellvalues, K, ch.dh, pml, k)
-    apply!(K, f, ch)
-	solve_time = @elapsed u = K \ f
-	apply!(u, ch)
-	abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
-	abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
-	rel_error = sqrt(abs_sq_error/abs_sq_norm)
-
 	return (assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
 end
 
@@ -245,7 +246,7 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
 		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
 		(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=2, pml, qr, pml_qr)
 		open("$result_folder/result.csv","a") do f
-			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel$n_h,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
+			println(f,"$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel$n_h,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
 		end
 	end
 
@@ -256,6 +257,9 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
 			println(f, "$k,$n_h,$N_θ,$N_r,$N_pml,InvHankel0,$assemble_time,$solve_time,$abs_sq_error,$abs_sq_norm,$rel_error")
 		end
 	end
+
+	# Add one where we use InvHankel n_h with n_h, N_pml=1 and we ratchet up the quadrature through the PML.
+	# Also, add quadrature info to all results in csv
 end
 
 # ╔═╡ 4770eea5-ddab-4d98-90b9-4f95fec8a23e
@@ -337,10 +341,9 @@ md"## Dependencies"
 # ╠═8947ed4c-ac37-4531-9252-63b195b73577
 # ╠═7fca1678-2d50-4ade-be8b-43430f751fcf
 # ╠═04a4723c-c9d3-46cd-8d22-48b9c992f366
-# ╠═614a288d-f6f7-499e-a141-33915a26d6d4
 # ╠═76070b3b-2663-481f-8deb-cf995bb9b640
+# ╠═c75d6e53-ee17-4587-925c-f253705b633d
 # ╠═4770eea5-ddab-4d98-90b9-4f95fec8a23e
-# ╠═5956884c-62b8-4894-bb1b-b588d1721967
 # ╠═5ec5d21a-3bcf-4cde-a814-f4fb71c30a2f
 # ╠═ef1dac4e-77ea-47ef-a94a-bf63395120bc
 # ╟─0d050dc4-0b97-4a0c-b399-970e1f7284c9
