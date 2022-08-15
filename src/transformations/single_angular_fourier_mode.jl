@@ -1,9 +1,18 @@
+"""
+    InvHankelPML(geom <: AnnularPML, mode <: SingleAngularFourierMode, cache)
 
+An optimal transformation defined on an annular PML which is the inverse of
+single angular Fourier/radial Hankel mode, functionally this is equivalent to
+the inverse of a Hankel function. By default this struct has a simple cache,
+which greatly speeds up evaluation on regularly FEM grids (a typical use case).
+The cache can be disabled by passing in `nothing`.
+"""
 mutable struct InvHankelPML{P <: AnnularPML, M <: SingleAngularFourierMode,C}
-    "Geometry of the PML"
+    "Geometry of the PML on which the transformation is defined"
     geom::P
-    "Wavenumber of the equation/field"
+    "Single mode we will invert to find the transformation"
     mode::M
+    "Cache the values and derivatives of the transformation as we evaluate them"
     cache::C
 end
 
