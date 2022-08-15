@@ -60,6 +60,10 @@ export HankelSeries,
        two_mode_pole_coef,
        scattered_coef
 
+export InvHankelSeriesPML
+export add_interpolation!
+export has_interpolation
+
 export interpolate,
        InterpPoint,
        InterpLine,
