@@ -186,17 +186,17 @@ function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pm
 	(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = Iterators.cycle(NaN)
 	try
 		dim=2
-	
+
 		ip = Lagrange{dim, RefCube, order}()
 		if order == 2
 			grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
 		else
 			error()
 		end
-	
+
 		dh = DofHandler(ComplexF64, grid, [:u])
 		ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
-	
+
 		cellvalues = CellScalarValues(qr, ip);
 		pml_cellvalues = CellScalarValues(pml_qr, ip);
 		K = create_sparsity_pattern(ch.dh, ch)
@@ -207,7 +207,8 @@ function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pm
 		abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
 		abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
 		rel_error = sqrt(abs_sq_error/abs_sq_norm)
-	catch
+	catch e
+        @error e
 	end
 	return (assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
 end
@@ -250,7 +251,7 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
 		end
 	end
 
-	# InvHankel n_h with N_pml=1 and 
+	# InvHankel n_h with N_pml=1 and increasing integration order
 	let
 		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
 		aniso_pml_qr=anisotropic_quadrature(RefCube, N_pml*nqr_1d, nqr_1d)
@@ -319,6 +320,7 @@ md"## Dependencies"
 # ╠═53ae2bac-59b3-44e6-9d6c-53a18567ea2f
 # ╟─30826935-619b-460a-afc2-872950052f7a
 # ╠═baca19e6-ee39-479e-9bd5-f5838cc9f869
+# ╠═721a855f-49aa-40ae-93ad-a1cc5313e399
 # ╟─8296d8a7-41ce-4111-9564-05e7cdc4bfe8
 # ╠═d87c0552-eec5-4765-ad04-03fbab2727fe
 # ╟─27d3071a-722e-4c0d-98b9-cd04d7c7980a
