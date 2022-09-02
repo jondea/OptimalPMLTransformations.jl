@@ -44,6 +44,10 @@ mutable struct Interpolation
     rips::Vector{Rip}
 end
 
+Interpolation() = Interpolation([],[])
+
+Base.isempty(i::Interpolation) = isempty(i.continuous_region)
+
 import Base.summary
 function summary(io::IO, intrp::Interpolation)
     println(io, "Interpolation with $(length(intrp.rips)) rip$(length(intrp.rips) != 1 ? "s" : "")")
