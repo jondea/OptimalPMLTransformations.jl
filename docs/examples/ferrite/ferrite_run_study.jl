@@ -180,6 +180,102 @@ function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScala
     return K, f
 end
 
+# ╔═╡ 721a855f-49aa-40ae-93ad-a1cc5313e399
+function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml, k::Number) where {dim}
+	# What to dispatch? Optimal pml for hankel series?
+    T = dof_type(dh)
+	fill!(K.nzval, zero(T))
+    f = zeros(T, ndofs(dh))
+    assembler = start_assemble(K, f)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    global_dofs = zeros(Int, ndofs_per_cell(dh))
+
+    fe = zeros(T, n_basefuncs) # Local force vector
+    Ke = zeros(T, n_basefuncs, n_basefuncs) # Local stiffness mastrix
+
+	# Create interpolated transformation
+
+    for (cellcount, cell) in enumerate(CellIterator(dh))
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        coords = getcoordinates(cell)
+		if mean(coords) ∈ pml
+
+            # I think this just precalculates various values, we probably can't do it like this
+			reinit!(pml_cellvalues, cell)
+
+			function contribution(q_point, patch)
+                Ke = zeros(T, n_basefuncs, n_basefuncs)
+
+                # Create quad rule with a single point
+                # What coord space are we in here? How do we get to local?
+                # The inetgration scheme works in PMLspace I think
+                point_quad_rule = QuadratureRule{2,RefCube}([1.0],[Tensors.Vec(q_point[1], q_point[2])])
+                pml_cellvalues = CellScalarValues(point_quad_rule, cellvalues.func_interpol)
+
+
+                # We need to get the weight of the element, but the quad point weight comes from the scheme
+	            dΩ = getdetJdV(pml_cellvalues, q_point)
+
+                # Need to get the global coords (r,θ), PML coords (ν,θ) and local coords (s? for calculting shape functions)?
+	            coords_qp = spatial_coordinate(pml_cellvalues, q_point, coords)
+                r = coords_qp[1]
+	            θ = coords_qp[2]
+
+				tr, J_ = tr_and_jacobian(pml, patch, PolarCoordinates(r, θ))
+				J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
+
+	            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
+	            Jₜᵣᵣ = inv(J_pml)
+				detJₜᵣᵣ	= det(J_pml)
+	            for i in 1:n_basefuncs
+                    # These need to be calculated on the fly
+	                δu = shape_value(pml_cellvalues, q_point, i)
+	                ∇δu = shape_gradient(pml_cellvalues, q_point, i)
+
+	                for j in 1:n_basefuncs
+	                    u = shape_value(pml_cellvalues, q_point, j)
+	                    ∇u = shape_gradient(pml_cellvalues, q_point, j)
+	                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u
+										) * tr * detJₜᵣᵣ * dΩ
+	                end
+	            end
+                # Do we need fe too?
+                return Ke
+	        end
+			# Get subset of PML trans interpolation
+			# Call integrate, passing in the above function
+
+			# How to handle rips?
+			# for rips in subset, add line contribs end
+
+		else
+			# Bulk
+			reinit!(cellvalues, cell)
+			for q_point in 1:getnquadpoints(cellvalues)
+	            dΩ = getdetJdV(cellvalues, q_point)
+				coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+	            r = coords_qp[1]
+				Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/r])
+	            for i in 1:n_basefuncs
+	                δu = shape_value(cellvalues, q_point, i)
+	                ∇δu = shape_gradient(cellvalues, q_point, i)
+	                for j in 1:n_basefuncs
+	                    u = shape_value(cellvalues, q_point, j)
+	                    ∇u = shape_gradient(cellvalues, q_point, j)
+	                    Ke[i, j] += ((Jᵣₓ ⋅∇δu)⋅(Jᵣₓ ⋅∇u) - k^2*δu * u) * r * dΩ
+	                end
+	            end
+	        end
+		end
+
+        celldofs!(global_dofs, cell)
+        assemble!(assembler, global_dofs, fe, Ke)
+    end
+    return K, f
+end
+
 # ╔═╡ 5ec5d21a-3bcf-4cde-a814-f4fb71c30a2f
 function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, u_ana, order=2, pml, qr::QuadratureRule, pml_qr::QuadratureRule)
 	# Set to NaN initially in case we throw
