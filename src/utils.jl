@@ -13,6 +13,6 @@ end
 
 Return range with `n` added to beginning and end.
 """
-function padded_range(a, n::Integer) where T
+function padded_range(a, n::Integer)
     (minimum(a)-n):(maximum(a)+n)
 end
