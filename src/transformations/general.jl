@@ -66,35 +66,23 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         error("ν0 is nan, cannot continue")
     end
 
-    # Start with 0
-    ν = ν0
-    if !isnothing(ν_vec)
-        resize!(ν_vec, 1)
-        ν_vec[1] = ν
+    function push_trace_vectors(ν, tν, field)
+        if !isnothing(ν_vec     ) push!(ν_vec, ν) end
+        if !isnothing(tν_vec    ) push!(tν_vec, tν) end
+        if !isnothing(∂tν_∂ν_vec) push!(∂tν_∂ν_vec, ∂tν_∂ν(field,U_field)) end
+        if !isnothing(∂tν_∂ζ_vec) push!(∂tν_∂ζ_vec, ∂tν_∂ζ(field,U_field,ν)) end
     end
 
+    ν = ν0
+
     tν = complex(tν0)
-    if !isnothing(tν_vec)
-        resize!(tν_vec, 1)
-        tν_vec[1] = ν
-    end
 
     U=U_field.u
 
     field = field0
     field_prev = field0
 
-    # Add to vector if provided
-    if !isnothing(∂tν_∂ν_vec)
-        resize!(∂tν_∂ν_vec, 1)
-        ∂tν_∂ν_vec[1] = ∂tν_∂ν(field, U_field)
-    end
-
-    # Add to vector if provided
-    if !isnothing(∂tν_∂ζ_vec)
-        resize!(∂tν_∂ζ_vec, 1)
-        ∂tν_∂ζ_vec[1] = ∂tν_∂ζ(field, U_field, ν)
-    end
+    push_trace_vectors(ν, tν, field)
 
     # Tangent of tν
     t = ∂tν_∂ν(field_prev, U_field)
@@ -124,6 +112,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             if silent_failure
                 tν = T(NaN) + im*T(NaN)
                 field = field_fnc(tν)
+                push_trace_vectors(ν, tν, field)
                 break
             else
                 error("Too many steps overall, quitting")
@@ -139,11 +128,13 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             h = ν  - ν_prev
         end
 
-        # Stepsize is too small, give up (unless this is the last step)
-        if h < h_min && ν != ν_max
+        # Stepsize is too small, give up and mark end as NaN
+        if h < h_min
             if silent_failure
+                ν = ν_max
                 tν = T(NaN) + im*T(NaN)
                 field = field_fnc(tν)
+                push_trace_vectors(ν, tν, field)
                 break
             else
                 error("Step size is smller than minimum, quitting")
@@ -171,11 +162,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             && abs(tν-tν_prev) <= tν_jump_max
             && converged )
 
-            # Add values to vectors if provided
-            if !isnothing(ν_vec     ) push!(ν_vec, ν) end
-            if !isnothing(tν_vec    ) push!(tν_vec, tν) end
-            if !isnothing(∂tν_∂ν_vec) push!(∂tν_∂ν_vec, ∂tν_∂ν(field,U_field)) end
-            if !isnothing(∂tν_∂ζ_vec) push!(∂tν_∂ζ_vec, ∂tν_∂ζ(field,U_field,ν)) end
+            push_trace_vectors(ν, tν, field)
 
             # Store current as the starting point for next step
             field_prev = field
