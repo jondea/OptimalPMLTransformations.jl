@@ -175,13 +175,18 @@ function integrate_hcubature(intrp::Interpolation, f::Function; kwargs...)
 end
 
 function integrate_hcubature(region::ContinuousInterpolation, f::Function; kwargs...)
+    if length(region.lines) < 2
+        error("Need at least 2 lines to integrate between them")
+    end
     lines = Base.Iterators.Stateful(region.lines)
     line_prev = popfirst!(lines)
-    integrand = 0
+    line_next = peek(lines)
+    integrand = integrate_between_hcubature(line_prev, line_next, f; kwargs...)
+    line_prev = popfirst!(lines)
     while !isempty(lines)
         line_next = peek(lines)
         integrand += integrate_between_hcubature(line_prev, line_next, f; kwargs...)
         line_prev = popfirst!(lines)
     end
-    integrand
+    return integrand
 end

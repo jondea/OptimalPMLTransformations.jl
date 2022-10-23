@@ -7,7 +7,7 @@ the inverse of a Hankel function. By default this struct has a simple cache,
 which greatly speeds up evaluation on regularly FEM grids (a typical use case).
 The cache can be disabled by passing in `nothing`.
 """
-mutable struct InvHankelPML{P <: AnnularPML, M <: SingleAngularFourierMode,C}
+mutable struct InvHankelPML{P <: AnnularPML, M <: SingleAngularFourierMode,C} <: PML
     "Geometry of the PML on which the transformation is defined"
     geom::P
     "Single mode we will invert to find the transformation"
