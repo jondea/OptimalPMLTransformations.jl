@@ -5,7 +5,7 @@ An optimal transformation defined on an Annular PML which is the inverse of a
 series of angular Fourier/radial Hankel modes. The PML transformation stores an
 interpolation to allow for efficient evaluation anywhere in the PML.
 """
-mutable struct InvHankelSeriesPML{P <: AnnularPML, S <: HankelSeries}
+mutable struct InvHankelSeriesPML{P <: AnnularPML, S} <: PML
     "Geometry of the PML on which the transformation is defined"
     geom::P
     "A field defined as a series of Hankel functions which we will invert to find the transformation"

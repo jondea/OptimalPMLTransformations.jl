@@ -13,7 +13,7 @@ tν = -im/k*log(1-ν/δ)
 ```
 where `δ` is the PML thickness.
 """
-struct SFB{G <: PMLGeometry, T}
+struct SFB{G <: PMLGeometry, T} <: PML
     "Geometry of the PML"
     geom::G
     "Wavenumber of the equation/field"

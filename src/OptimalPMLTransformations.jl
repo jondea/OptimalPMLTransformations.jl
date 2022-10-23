@@ -51,6 +51,8 @@ export ∂u_∂tr
 
 export PlanarWave
 
+export PML
+
 export SingleAngularFourierMode,
        single_hankel_mode,
        single_angular_fourier_mode

@@ -1,3 +1,4 @@
+abstract type PML end
 
 include("planar_wave.jl")
 
