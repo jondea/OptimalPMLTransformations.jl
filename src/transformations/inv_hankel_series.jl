@@ -19,7 +19,7 @@ InvHankelSeriesPML(geom, u) = InvHankelSeriesPML(geom, u, Interpolation())
 # Note, we can set the default range to [0,τ] because an Annular PML is a full turn.
 # ν_max=1 means we attempt to set the whole PML region
 function add_interpolation!(p::InvHankelSeriesPML; num_ζs=11, ζs = range(0.0, τ, length=num_ζs), ν_max=1.0, kwargs...)
-    p.interp = interpolate(p.u, p.pml, ζs, ν_max; kwargs...)
+    p.interp = interpolate(p.u, p.geom, ζs, ν_max; kwargs...)
 end
 
 has_interpolation(p::InvHankelSeriesPML) = !isempty(p.interp)
@@ -29,5 +29,8 @@ function tr_and_jacobian(pml::InvHankelSeriesPML, patch::InterpPatch, coords::Po
 end
 
 function tr_and_jacobian(pml::InvHankelSeriesPML, patch::InterpPatch, coords::PMLCoordinates)
-    return evalute_and_correct(pml.u, pml.geom, patch, coords.ν, coords.ζ)
+    p = evalute_and_correct(pml.u, pml.geom, patch, coords.ν, coords.ζ[1])
+    jacobian = SA[p.∂tν_∂ν 0; p.∂tν_∂ζ 1]
+    tr = convert(PolarCoordinates, PMLCoordinates(p.tν, coords.ζ), pml.geom).r
+    return tr, jacobian
 end
