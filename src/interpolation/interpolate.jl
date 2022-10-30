@@ -1,13 +1,13 @@
 
 
-function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ = 1e-1, ε = 1e-4)
+function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ = 1e-1, ε = 1e-4, kwargs...)
 
     function create_line(ζ)
         ν_vec = Float64[]
         tν_vec = ComplexF64[]
         ∂tν_∂ν_vec = ComplexF64[]
         ∂tν_∂ζ_vec = ComplexF64[]
-        optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec; silent_failure=true)
+        optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec; silent_failure=true, kwargs...)
         # Add in point at ν=1? Try to work out if it's unbounded or not
         return InterpLine(ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec)
     end
