@@ -176,11 +176,13 @@ function eval_hermite_patch(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, 
     tν11=p11.tν; ∂tν_∂ν11=p11.∂tν_∂ν; ∂tν_∂ζ11=p11.∂tν_∂ζ
 
     δν = ν1 - ν0
+    δν = δν == 0 ? copysign(eps(δν),δν) : δν # Stop NaNs for edge case of ν1 == ν0
     sν = (ν - ν0) / δν
     h0ν, hd0ν, h1ν, hd1ν = CubicHermiteSpline.basis(sν)
     dh0ν, dhd0ν, dh1ν, dhd1ν = CubicHermiteSpline.basis_derivative(sν)
 
     δζ = ζ1 - ζ0
+    δζ = δζ == 0 ? copysign(eps(δζ),δζ) : δζ # Stop NaNs for edge case of ζ1 == ζ0
     sζ = (ζ - ζ0) / δζ
     h0ζ, hd0ζ, h1ζ, hd1ζ = CubicHermiteSpline.basis(sζ)
     dh0ζ, dhd0ζ, dh1ζ, dhd1ζ = CubicHermiteSpline.basis_derivative(sζ)
