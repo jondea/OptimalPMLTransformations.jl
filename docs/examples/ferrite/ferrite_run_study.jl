@@ -8,7 +8,7 @@ using InteractiveUtils
 begin
     import Pkg
     # activate the shared project environment
-    Pkg.activate(Base.current_project())
+    Pkg.activate(@__DIR__)
     # instantiate, i.e. make sure that all packages are downloaded
     Pkg.instantiate()
 	using PlutoLinks
@@ -20,6 +20,7 @@ begin
     using LinearAlgebra
 	# using OptimalPMLTransformations
 	using StaticArrays
+	using OffsetArrays
 	using ProgressMeter
 	import ProgressMeter: update!
     import FerriteViz, GLMakie
@@ -93,25 +94,28 @@ html"""
 PlutoUI.TableOfContents()
 
 # ╔═╡ 759eb280-f138-46f8-af4e-7447a38c4a9f
-(f::SingleAngularFourierMode)(c::Node) = f(c.x)
+(f::AbstractFieldFunction)(c::Node) = f(c.x)
 
 # ╔═╡ 424be202-5f13-46e1-a4db-8cbd6937fdcc
-(f::SingleAngularFourierMode)(x::Vec{2}, _t::Number) = f(x)
+# Ignore time dependence (problem is time harmonic)
+(f::AbstractFieldFunction)(x::Vec{2}, _t::Number) = f(x)
 
 # ╔═╡ ea07bf0c-552c-46fe-9431-4ca6a99e3647
-(f::SingleAngularFourierMode)(x::Vec{2}) = f(PolarCoordinates(x[1],x[2]))
+# Interpret Vec (the problem coordinates) as polar coordinates for the field function
+(f::AbstractFieldFunction)(x::Vec{2}) = f(PolarCoordinates(x[1],x[2]))
 
 # ╔═╡ 691593a3-4e68-4b3c-8020-ee07bf773486
 Base.in(n::Node, pml::PMLGeometry) = in(n.x, pml)
 
 # ╔═╡ 8947ed4c-ac37-4531-9252-63b195b73577
-Base.in(x::Vec{2}, pml::AnnularPML) = x[1] >= pml.R
+Base.in(x::AbstractVector, pml::AnnularPML) = x[1] >= pml.R
 
 # ╔═╡ 7fca1678-2d50-4ade-be8b-43430f751fcf
-Base.in(x, pml::SFB) = in(x, pml.geom)
+Base.in(x::AbstractVector, pml::SFB) = in(x, pml.geom)
 
 # ╔═╡ 04a4723c-c9d3-46cd-8d22-48b9c992f366
-Base.in(x, pml::InvHankelPML) = in(x, pml.geom)
+Base.in(x::AbstractVector, pml::PML) = in(x, pml.geom)
+
 
 # ╔═╡ baca19e6-ee39-479e-9bd5-f5838cc9f869
 function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScalarValues{dim},
@@ -180,9 +184,13 @@ function doassemble(cellvalues::CellScalarValues{dim}, pml_cellvalues::CellScala
     return K, f
 end
 
+function doassemble(cellvalues::CellScalarValues{dim}, ::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml::InvHankelSeriesPML, k::Number) where {dim}
+    doassemble(cellvalues, K, dh, pml, k)
+end
+
 # ╔═╡ 721a855f-49aa-40ae-93ad-a1cc5313e399
-function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml, k::Number) where {dim}
-	# What to dispatch? Optimal pml for hankel series?
+function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml::InvHankelSeriesPML, k::Number) where {dim}
+
     T = dof_type(dh)
 	fill!(K.nzval, zero(T))
     f = zeros(T, ndofs(dh))
@@ -194,62 +202,79 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     fe = zeros(T, n_basefuncs) # Local force vector
     Ke = zeros(T, n_basefuncs, n_basefuncs) # Local stiffness mastrix
 
-	# Create interpolated transformation
-
     for (cellcount, cell) in enumerate(CellIterator(dh))
         fill!(Ke, 0)
         fill!(fe, 0)
         coords = getcoordinates(cell)
-		if mean(coords) ∈ pml
 
-            # I think this just precalculates various values, we probably can't do it like this
-			reinit!(pml_cellvalues, cell)
+        mean_coords = mean(coords)
+        in_pml = in(mean_coords,pml)
+		if mean_coords ∈ pml
+            # Get range of r, θ this element covers, this should create a tight covering because
+            # nodes are shared between elements, so no rips should get through the floating point cracks
+            r_min, r_max = extrema(c->c[1], coords)
+            θ_min, θ_max = extrema(c->c[2], coords)
 
-			function contribution(q_point, patch)
-                Ke = zeros(T, n_basefuncs, n_basefuncs)
+            # Used inside integrate_hcubature
+			function contribution(patch, ν, ζ)
+
+                (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
+
+                # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
+                # Should be able to convert from θ to s using min and max
+                s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
+                s_r = 2(r - r_min)/(r_max - r_min) - 1
+                q_point = Tensors.Vec(s_r, s_θ)
+
+                # How do we know which local coord goes through or across the PML?
+                # Try one way, check that spatial_coordinate below gives us the right answer
 
                 # Create quad rule with a single point
                 # What coord space are we in here? How do we get to local?
                 # The inetgration scheme works in PMLspace I think
-                point_quad_rule = QuadratureRule{2,RefCube}([1.0],[Tensors.Vec(q_point[1], q_point[2])])
-                pml_cellvalues = CellScalarValues(point_quad_rule, cellvalues.func_interpol)
+                point_quad_rule = QuadratureRule{2,RefCube,Float64}([1.0],[Tensors.Vec(q_point[1], q_point[2])])
+                pml_cellvalues = CellScalarValues(point_quad_rule, cellvalues.func_interp)
+			    reinit!(pml_cellvalues, cell)
 
+                Ke = zeros(T, n_basefuncs, n_basefuncs)
 
-                # We need to get the weight of the element, but the quad point weight comes from the scheme
-	            dΩ = getdetJdV(pml_cellvalues, q_point)
-
-                # Need to get the global coords (r,θ), PML coords (ν,θ) and local coords (s? for calculting shape functions)?
-	            coords_qp = spatial_coordinate(pml_cellvalues, q_point, coords)
-                r = coords_qp[1]
-	            θ = coords_qp[2]
+	            dΩ = getdetJdV(pml_cellvalues, 1)
 
 				tr, J_ = tr_and_jacobian(pml, patch, PolarCoordinates(r, θ))
 				J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
-
 	            Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
 	            Jₜᵣᵣ = inv(J_pml)
 				detJₜᵣᵣ	= det(J_pml)
 	            for i in 1:n_basefuncs
-                    # These need to be calculated on the fly
-	                δu = shape_value(pml_cellvalues, q_point, i)
-	                ∇δu = shape_gradient(pml_cellvalues, q_point, i)
+	                δu = shape_value(pml_cellvalues, 1, i)
+	                ∇δu = shape_gradient(pml_cellvalues, 1, i)
 
 	                for j in 1:n_basefuncs
-	                    u = shape_value(pml_cellvalues, q_point, j)
-	                    ∇u = shape_gradient(pml_cellvalues, q_point, j)
+	                    u = shape_value(pml_cellvalues, 1, j)
+	                    ∇u = shape_gradient(pml_cellvalues, 1, j)
 	                    Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u
 										) * tr * detJₜᵣᵣ * dΩ
 	                end
 	            end
-                # Do we need fe too?
+                if any(isnan.(Ke))
+                    @show tr, J_, Jᵣₓ, Jₜᵣᵣ, patch
+                end
                 return Ke
 	        end
-			# Get subset of PML trans interpolation
-			# Call integrate, passing in the above function
+
+            ν_max = 1.0
+            intrp = interpolate(pml.u, pml.geom, range(θ_min, θ_max, length=3), ν_max; h_min=1e-8)
+
+            # Need to constrain dofs on outer boundary
+            # I think that because Ferrite imposes BCs after matrix setup, we can't use the usual way for these
+            # unbounded integrals.
+            # - Is the easiest way to do this as a boundary elements?
+            # - Or can we just mask out the values that correspond to the outer boundary?
+            #    (Although this doesn't fix the linear profile, that would require us to implement a new element, which might throw off the isoparametric stuff)
+            integrate_hcubature(intrp, contribution; atol=1e-14, rtol=1e-12, maxevals=1_000)
 
 			# How to handle rips?
-			# for rips in subset, add line contribs end
-
+			# for rips in subset, add line contribs
 		else
 			# Bulk
 			reinit!(cellvalues, cell)
@@ -306,7 +331,27 @@ function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pm
 	catch e
         @error e
 	end
-	return (assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
+end
+
+let
+    k=1.0
+    n_h=0
+    R = 4.0
+    N_θ = 1
+    N_pml = 1
+    N_r = 1
+    order = 2
+    δ_pml=1.0
+    cylinder_radius = 1.0
+    # nqr_1d = 2*(order + 1)
+    nqr_1d = order
+    qr=QuadratureRule{2, RefCube}(nqr_1d)
+    pml_qr=QuadratureRule{2, RefCube}(nqr_1d)
+    u_ana=HankelSeries(k, OffsetVector([1.0], n_h:n_h))
+
+# Optimal
+    pml = InvHankelSeriesPML(AnnularPML(R, δ_pml), u_ana)
+    (assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, qr, pml_qr)
 end
 
 # ╔═╡ ef1dac4e-77ea-47ef-a94a-bf63395120bc
@@ -385,10 +430,10 @@ function run_all(;test_run=false)
 end
 
 # ╔═╡ 76070b3b-2663-481f-8deb-cf995bb9b640
-results_df = run_all(test_run=true)
+# results_df = run_all(test_run=true)
 
 # ╔═╡ 1d6054f2-6ae5-4d09-8c7e-fe536512e3c6
-filter(r->r.N_pml == 1, results_df);
+# filter(r->r.N_pml == 1, results_df);
 
 # ╔═╡ d87c0552-eec5-4765-ad04-03fbab2727fe
 function solve(ch, cellvalues, pml_cellvalues)

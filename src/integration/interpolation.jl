@@ -159,6 +159,7 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
             ret
         end
         I, E = hcubature(integrand_fnc, SA[ν0, ζ0], SA[ν1, ζ1]; kwargs...)
+        integrand += I
         ν1 = intrp11.ν # == intrp10.ν
 
         # End points from this patch become start points for next patch
