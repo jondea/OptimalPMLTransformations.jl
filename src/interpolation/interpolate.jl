@@ -228,8 +228,7 @@ end
 
 "Cubic interpolation in one direction, linear extrapolation in another"
 function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::Dtν_νζ, p01::Dtν_νζ, ν::Number, ζ::Number)
-    δν = ν1 - ν0
-    sν0 = (ν - ν0) / δν
+    sν0 = ν - ν0
     hν = 1
     hdν = sν0
 
