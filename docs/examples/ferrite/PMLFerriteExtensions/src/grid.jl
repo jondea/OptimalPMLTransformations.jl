@@ -5,7 +5,10 @@
 function generate_pml_grid(::Type{QuadraticQuadrilateral}, N_θ, N_r, N_pml, r_inner, R, δ_pml)
     ncell_x = (N_r + N_pml)
  	ncell_y = N_θ
-	nodes_x = vcat(range(r_inner,R,length=2*N_r+1), skipfirst(range(R,R+δ_pml,length=2*N_pml+1)))
+    nodes_x = collect(range(r_inner, R, length=2*N_r+1))
+    if N_pml != 0
+        append!(nodes_x, skipfirst(range(R, R+δ_pml, length=2*N_pml+1)))
+    end
 	nodes_y = range(0,τ,length=2*N_θ+1)
 
 	# Generate nodes
@@ -53,7 +56,7 @@ function generate_pml_grid(::Type{QuadraticQuadrilateral}, N_θ, N_r, N_pml, r_i
     onbottom(x) = x[2]≈0
     ontop(x) = x[2]≈τ
     onleft(x) = x[1]≈r_inner
-    onright(x) = x[1]≈(R+δ_pml)
+    onright(x) = x[1]≈(R + (N_pml>0)*δ_pml)
 
     addfaceset!(grid, "bottom", onbottom)
     addfaceset!(grid, "right", onright)
