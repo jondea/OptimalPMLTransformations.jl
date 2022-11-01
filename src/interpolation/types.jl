@@ -112,6 +112,6 @@ isinf(p::Dtν_νζ) = isinf(p.tν) || isinf(p.∂tν_∂ν) || isinf(p.∂tν_�
 isinf(p::Dtν_ν) = isinf(p.tν) || isinf(p.∂tν_∂ν)
 
 import Base.isfinite
-isfinite(p::InterpPoint) = isfinite(p.ν) || isfinite(p.tν) || isfinite(p.∂tν_∂ν) || isfinite(p.∂tν_∂ζ)
-isfinite(p::Dtν_νζ) = isfinite(p.tν) || isfinite(p.∂tν_∂ν) || isfinite(p.∂tν_∂ζ)
-isfinite(p::Dtν_ν) = isfinite(p.tν) || isfinite(p.∂tν_∂ν)
+isfinite(p::InterpPoint) = isfinite(p.ν) && isfinite(p.tν) && isfinite(p.∂tν_∂ν) && isfinite(p.∂tν_∂ζ)
+isfinite(p::Dtν_νζ) = isfinite(p.tν) && isfinite(p.∂tν_∂ν) && isfinite(p.∂tν_∂ζ)
+isfinite(p::Dtν_ν) = isfinite(p.tν) && isfinite(p.∂tν_∂ν)
