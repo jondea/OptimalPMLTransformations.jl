@@ -170,7 +170,13 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
 end
 
 function integrate_hcubature(intrp::Interpolation, f::Function; kwargs...)
-    mapreduce(region->integrate_hcubature(region, f; kwargs...), +, intrp.continuous_region)
+    # Changed mapreduce to a for loop to make interactive debugging easier
+    # mapreduce(region->integrate_hcubature(region, f; kwargs...), +, intrp.continuous_region)
+    integral = integrate_hcubature(first(intrp.continuous_region), f; kwargs...)
+    for region in intrp.continuous_region[2:end]
+        integral += integrate_hcubature(region, f; kwargs...)
+    end
+    return integral
 end
 
 function integrate_hcubature(region::ContinuousInterpolation, f::Function; kwargs...)
