@@ -281,12 +281,17 @@ end
 
 function evalute_and_correct(u, pml, patch::InterpPatch, ν, ζ)
     intrp = evaluate(patch, ν, ζ)
+    if !isfinite(intrp)
+        @warn "Patch evaluated to non-finite value, there's no hope for the corrector"
+    end
     field_fnc(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν, ζ), pml)
     U_field = field_fnc(zero(complex(ν)))
     tν, field, converged = corrector(field_fnc, U_field.u, ν, intrp.tν)
     if converged
         return InterpPoint(ν, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field, ν))
     else
+        @warn "Corrector did not converge for patch"
+        @show patch, ν, ζ
         return InterpPoint(ν, NaN+im*NaN, NaN+im*NaN, NaN+im*NaN)
     end
 end
