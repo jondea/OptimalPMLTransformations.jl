@@ -148,8 +148,6 @@ function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::Inter
             intrp11 = popfirst!(intrp_points1)
         end
 
-        if isnan(intrp10.tν) || isnan(intrp11.tν) error("Oh noes") end
-
         ν1 = intrp11.ν # == intrp10.ν
 
         patch = InterpPatch(intrp00, intrp01, intrp10, intrp11, ζ0, ζ1)
