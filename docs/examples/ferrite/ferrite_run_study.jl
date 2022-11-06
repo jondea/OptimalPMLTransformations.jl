@@ -234,7 +234,6 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
                     Ke = zeros(T, n_basefuncs, n_basefuncs)
 
-                    dΩ = getdetJdV(pml_cellvalues, 1)
                     tr, J_ = tr_and_jacobian(pml, patch, PolarCoordinates(r, θ))
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
                     Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
@@ -254,8 +253,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                             u = U*(1-ν)
                             ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
 
-                            Ke[i, j] += ((Jₜᵣᵣ ⋅ (Jᵣₓ ⋅ ∇δu)) ⋅ (Jₜᵣᵣ ⋅ (Jᵣₓ⋅∇u)) - k^2*δu * u
-                                            ) * tr * detJₜᵣᵣ * dΩ
+                            # Note there is no dΩ scaling because this is handled in the integrate function which calls this
+                            Ke[i, j] += ((Jₜᵣᵣ ⋅ Jᵣₓ ⋅ ∇δu) ⋅ (Jₜᵣᵣ ⋅ Jᵣₓ⋅∇u) - k^2*δu * u) * tr * detJₜᵣᵣ
                         end
                     end
                     return Ke
