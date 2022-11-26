@@ -335,10 +335,10 @@ function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pm
 		abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
 		abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
 		rel_error = sqrt(abs_sq_error/abs_sq_norm)
-        return (;assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
 	catch e
         @error e
-	end
+    end
+    return (;assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
 end
 
 let
