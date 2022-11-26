@@ -20,6 +20,7 @@ begin
     using LinearAlgebra
 	# using OptimalPMLTransformations
 	using StaticArrays
+	using IterTools
 	using OffsetArrays
 	using ProgressMeter
 	import ProgressMeter: update!
@@ -192,6 +193,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, ::CellScalarValues{dim}, 
     doassemble(cellvalues, K, dh, pml, k)
 end
 
+consecutive_pairs(r) = IterTools.partition(r, 2, 1)
+
 # ╔═╡ 721a855f-49aa-40ae-93ad-a1cc5313e399
 function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml::InvHankelSeriesPML, k::Number) where {dim}
 
@@ -274,8 +277,53 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # isoparametric stuff)
                 Ke += integrate_hcubature(intrp, contribution; atol=1e-12, rtol=1e-10, maxevals=10_000)
 
-                # How to handle rips?
-                # for rips in subset, add line contribs
+                # Used inside integrate_hcubature
+                function jump_contribution(segment, ν)
+                    ζ = segment.ζ
+                    (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
+
+                    # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
+                    s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
+
+                    # Create quad rule with a single point
+                    point_quad_rule = QuadratureRule{1,RefCube,Float64}([1.0],[Tensors.Vec(s_θ)])
+                    pml_cellvalues = FaceScalarValues(point_quad_rule, cellvalues.func_interp)
+                    reinit!(pml_cellvalues, cell, face)
+
+                    Ke = zeros(T, n_basefuncs, n_basefuncs)
+
+                    tr, J_ = tr_and_jacobian(pml, segment, PolarCoordinates(r, θ))
+                    dtr_dν = J_[1,1]
+                    J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
+                    Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
+                    Jₜᵣᵣ = inv(J_pml)
+                    dtx_dtr = Tensors.Vec{2}(-sin(θ), cos(θ))
+                    for i in 1:n_basefuncs
+                        # Shape function is defined on face, we use ν to extend into the collapsed PML
+                        δU = shape_value(pml_cellvalues, 1, i)
+                        ∇δU = shape_gradient(pml_cellvalues, 1, i)
+                        δu = δU*(1-ν)
+                        ∇δu = Tensors.Vec(-δU, ∇δU[2]*(1-ν))
+
+                        for j in 1:n_basefuncs
+                            # Shape function is defined on face, we use ν to extend into the collapsed PML
+                            U = shape_value(pml_cellvalues, 1, j)
+                            ∇U = shape_gradient(pml_cellvalues, 1, j)
+                            u = U*(1-ν)
+                            ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
+
+                            Ke[i, j] += (δu * ((Jₜᵣᵣ ⋅ Jᵣₓ⋅∇u) ⋅dtx_dtr)) *dtr_dν
+                        end
+                    end
+                    return Ke
+                end
+
+                # Between each continuous region is a rip
+                for (region1, region2) in consecutive_pairs(intrp.continuous_region)
+                    tν₋ = last(region1.lines)
+                    tν₊ = first(region2.lines)
+                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_contribution; atol=1e-12, rtol=1e-10, maxevals=10_000)
+                end
             end
         end
 
@@ -359,6 +407,7 @@ let
     qr=QuadratureRule{2, RefCube}(nqr_1d)
     pml_qr=QuadratureRule{2, RefCube}(nqr_1d)
     u_ana=HankelSeries(k, OffsetVector([1.0], n_h:n_h))
+    # u_ana=two_mode_pole_series(k, R + (1.0+1.0im))
 
 # Optimal
     pml = InvHankelSeriesPML(AnnularPML(R, δ_pml), u_ana)
