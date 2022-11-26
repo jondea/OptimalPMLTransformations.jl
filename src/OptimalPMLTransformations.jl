@@ -60,6 +60,7 @@ export InvHankelPML
 
 export HankelSeries,
        two_mode_pole_coef,
+       two_mode_pole_series,
        scattered_coef
 
 export InvHankelSeriesPML

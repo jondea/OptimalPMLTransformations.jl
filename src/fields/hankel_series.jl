@@ -141,3 +141,5 @@ function two_mode_pole_coef(n, z_pole, θ_pole=0.0)
     end
 end
 two_mode_pole_coef(ind::AbstractArray, z_pole, θ_pole=0.0) = map(n->two_mode_pole_coef(n, z_pole, θ_pole), Base.Slice(ind))
+
+two_mode_pole_series(k, r_pole) = HankelSeries(k, OffsetVector(two_mode_pole_coef(0:1, k*r_pole),0:1))
