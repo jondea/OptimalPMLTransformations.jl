@@ -29,6 +29,16 @@ end
 import Base.zero
 zero(::Type{InterpPatch}) = InterpPatch(zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), 0, 0)
 
+struct InterpSegment
+    p0::InterpPoint
+    p1::InterpPoint
+    ζ::Float64
+end
+
+Base.zero(::Type{InterpSegment}) = InterpSegment(zero(InterpPoint), zero(InterpPoint), 0)
+segment0(p::InterpPatch) = InterpSegment(p.p00, p.p10, p.ζ0)
+segment1(p::InterpPatch) = InterpSegment(p.p01, p.p11, p.ζ1)
+
 function InterpLine(ζ::Float64, ν_vec::Vector{Float64}, tν_vec::Vector{ComplexF64}, ∂tν_∂ν_vec::Vector{ComplexF64}, ∂tν_∂ζ_vec::Vector{ComplexF64})
     InterpLine(ζ, [InterpPoint(t...) for t in zip(ν_vec,tν_vec,∂tν_∂ν_vec,∂tν_∂ζ_vec)])
 end
