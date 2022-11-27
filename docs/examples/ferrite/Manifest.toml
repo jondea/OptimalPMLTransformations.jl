@@ -2,7 +2,7 @@
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "597c5f4c1da62458ab3b35815b86e6ece9d5a4cc"
+project_hash = "4f41387a7afc8de8c1758aa106ecef2463db0c05"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -918,7 +918,7 @@ uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.5+0"
 
 [[deps.OptimalPMLTransformations]]
-deps = ["CubicHermiteSpline", "Einsum", "FastGaussQuadrature", "HCubature", "InverseHankelFunction", "LinearAlgebra", "OffsetArrays", "ProgressMeter", "SpecialFunctions", "StaticArrays", "Tau"]
+deps = ["CubicHermiteSpline", "Einsum", "FastGaussQuadrature", "HCubature", "InverseHankelFunction", "IterTools", "LinearAlgebra", "OffsetArrays", "ProgressMeter", "SpecialFunctions", "StaticArrays", "Tau"]
 path = "../../.."
 uuid = "8e7146f2-eb4f-11e9-33f3-abad4b927b14"
 version = "0.1.0"
