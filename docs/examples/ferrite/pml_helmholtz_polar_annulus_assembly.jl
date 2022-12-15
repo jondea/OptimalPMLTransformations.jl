@@ -1,3 +1,5 @@
+using Parameters
+
 function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right_bc)
 	ch = ConstraintHandler(dh)
 
@@ -264,41 +266,74 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
     return K, f
 end
 
-function solve_for_error(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, u_ana, order=2, pml, qr::QuadratureRule, pml_qr::QuadratureRule)
-	# Set to NaN initially in case we throw
-	(assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error) = Iterators.cycle(NaN)
-	try
-		dim=2
+@with_kw mutable struct PMLHelmholtzPolarAnnulusParams{F,P,BQR,PQR}
+    k::Float64
+    N_θ::Int
+    N_r::Int
+    N_pml::Int
+    cylinder_radius::Float64 = 1.0
+    R::Float64 = 2.0
+    δ_pml::Float64 = 1.0
+    u_ana::F
+    pml::P = nothing
+    order::Int = 2
+    bulk_qr::BQR
+    pml_qr::PQR
+end
 
-		ip = Lagrange{dim, RefCube, order}()
-		if order == 2
-			grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
-		else
-			error()
-		end
+@with_kw mutable struct Result
+    assemble_time::Float64 = NaN
+    solve_time::Float64 = NaN
+    abs_sq_error::Float64 = NaN
+    abs_sq_norm::Float64 = NaN
+    rel_error::Float64 = NaN
+end
 
-		dh = DofHandler(ComplexF64, grid, [:u])
-        # If N_pml == 0, then PML will be applied as a boundary condition
-        if N_pml == 0
-            ch = setup_constraint_handler(dh, u_ana, nothing)
-        else
-		    ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
-        end
+# Very clever generic ways to print to CSV, but we actually need a custom function
+csv_header(t) = csv_header(typeof(t))
+csv_header(t::DataType) = join(string.(fieldnames(t)),',')
 
-		cellvalues = CellScalarValues(qr, ip);
-		pml_cellvalues = CellScalarValues(pml_qr, ip);
-		K = create_sparsity_pattern(ch.dh, ch)
-		assemble_time = @elapsed K, f = doassemble(cellvalues, pml_cellvalues, K, ch.dh, pml, k)
-	    apply!(K, f, ch)
-		solve_time = @elapsed u = K \ f
-		apply!(u, ch)
-		abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
-		abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
-		rel_error = sqrt(abs_sq_error/abs_sq_norm)
-	catch e
-        @error e
+@generated function to_csv(p::P) where P
+    ex = :(String[])
+    for name in fieldnames(P)
+        ex = :(vcat(string(p.$name), $ex))
     end
-    return (;assemble_time, solve_time, abs_sq_error, abs_sq_norm, rel_error)
+    return :(join($ex,','))
+end
+
+function solve(params::PMLHelmholtzPolarAnnulusParams)
+    result = Result()
+    dim=2
+
+    @unpack k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr = params
+
+    ip = Lagrange{dim, RefCube, params.order}()
+    if order == 2
+        grid = generate_pml_grid(QuadraticQuadrilateral, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml)
+    else
+        error()
+    end
+
+    dh = DofHandler(ComplexF64, grid, [:u])
+    # If N_pml == 0, then PML will be applied as a boundary condition
+    if N_pml == 0
+        ch = setup_constraint_handler(dh, u_ana, nothing)
+    else
+        ch = setup_constraint_handler(dh, u_ana, (x,t)->zero(ComplexF64))
+    end
+
+    cellvalues = CellScalarValues(bulk_qr, ip);
+    pml_cellvalues = CellScalarValues(pml_qr, ip);
+    K = create_sparsity_pattern(ch.dh, ch)
+    result.assemble_time = @elapsed K, f = doassemble(cellvalues, pml_cellvalues, K, ch.dh, pml, k)
+    apply!(K, f, ch)
+    result.solve_time = @elapsed u = K \ f
+    apply!(u, ch)
+    result.abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
+    result.abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
+    result.rel_error = sqrt(result.abs_sq_error/result.abs_sq_norm)
+
+    return result
 end
 
 function solve(ch, cellvalues, pml_cellvalues)
