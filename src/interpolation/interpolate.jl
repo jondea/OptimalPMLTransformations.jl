@@ -294,3 +294,31 @@ function evalute_and_correct(u, pml, patch::InterpPatch, ν, ζ)
         return InterpPoint(ν, NaN+im*NaN, NaN+im*NaN, NaN+im*NaN)
     end
 end
+
+
+function evaluate(segment::InterpSegment, ν)::InterpPoint
+
+    p0 = segment.p0
+    p1 = segment.p1
+
+    ν0 = p0.ν
+    ν1 = p1.ν
+
+    # 2 special cases we want to handle differently
+    if !isfinite(p1.tν)
+        # p1 is not finite, extrapolate from p0 (this happens on the outer edge)
+        tν = linear_extrapolation(ν0, p0.tν, p0.∂tν_∂ν, ν)
+        return InterpPoint(ν, tν, p0.∂tν_∂ν, p0.∂tν_∂ζ)
+    elseif !isfinite(p0.∂tν_∂ν) || !isfinite(p0.∂tν_∂ζ) ||
+           !isfinite(p1.∂tν_∂ν) || !isfinite(p1.∂tν_∂ζ)
+        # Some derivatives are bad, fall back to linear interpolation
+        return linear_interpolation(p0, p1, ν)
+    else
+        # Everything else, note that there may still be NaNs/Infs, and they just propagate
+        tν_and_∂tν_∂ν = eval_hermite_patch(ν0, ν1, Dtν_ν(p0), Dtν_ν(p1), ν)
+        ∂tν_∂ζ = linear_interpolation(ν0, ν1, p0.∂tν_∂ζ, p1.∂tν_∂ζ, ν)
+        return InterpPoint(ν, tν_and_∂tν_∂ν, ∂tν_∂ζ)
+    end
+end
+
+(segment::InterpSegment)(ν::Number) = evaluate(segment, ν)
