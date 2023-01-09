@@ -95,6 +95,14 @@ function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ
     return intrp
 end
 
+function interpolation(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0, kwargs...)
+	νs = Float64[]
+	tνs = ComplexF64[]
+	∂tν_∂νs = ComplexF64[]
+	∂tν_∂ζs = ComplexF64[]
+	optimal_pml_transformation_solve(u_pml.u, u_pml.pml, ν_max, ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs; kwargs...)
+	return InterpLine(ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs)
+end
 
 function eval_hermite_patch(ν0::Number, ν1::Number, p0::Dtν_ν, p1::Dtν_ν, ν::Number)
 
