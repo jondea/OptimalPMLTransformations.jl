@@ -120,6 +120,17 @@ function eval_hermite_patch(ν0::Number, ν1::Number, p0::Dtν_ν, p1::Dtν_ν, 
     return tν, dtν_ds/δ
 end
 
+linear_interpolation(x0, x1, f0, f1, x) = f1*(x-x0)/(x1-x0) + f0*(x1-x)/(x1-x0)
+
+function linear_interpolation(p0::InterpPoint, p1::InterpPoint, ν::Number)
+    return InterpPoint(
+        ν,
+        linear_interpolation(p0.ν, p1.ν, p0.tν,     p1.tν,     ν),
+        linear_interpolation(p0.ν, p1.ν, p0.∂tν_∂ν, p1.∂tν_∂ν, ν),
+        linear_interpolation(p0.ν, p1.ν, p0.∂tν_∂ζ, p1.∂tν_∂ζ, ν)
+    )
+end
+
 function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
 
     ν0=p0.ν; tν0=p0.tν; ∂tν_∂ν0=p0.∂tν_∂ν; ∂tν_∂ζ0=p0.∂tν_∂ζ
