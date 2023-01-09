@@ -125,3 +125,13 @@ import Base.isfinite
 isfinite(p::InterpPoint) = isfinite(p.ν) && isfinite(p.tν) && isfinite(p.∂tν_∂ν) && isfinite(p.∂tν_∂ζ)
 isfinite(p::Dtν_νζ) = isfinite(p.tν) && isfinite(p.∂tν_∂ν) && isfinite(p.∂tν_∂ζ)
 isfinite(p::Dtν_ν) = isfinite(p.tν) && isfinite(p.∂tν_∂ν)
+
+"""
+Use the InterpPatch as an initial guess, then solve to find the optimal pml transformation
+"""
+struct ExactPatch{PMLFF <: PMLFieldFunction}
+    patch::InterpPatch
+    u_pml::PMLFF
+end
+(ep::ExactPatch)(ν::Number, ζ::Number) = evalute_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ν, ζ)
+(ep::ExactPatch)(νζ::AbstractVector) = ep(νζ[1], νζ[2])
