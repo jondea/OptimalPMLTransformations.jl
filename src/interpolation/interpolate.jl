@@ -284,7 +284,7 @@ function evaluate(patch::InterpPatch, ν, ζ)::InterpPoint
     ν0 = intrp00.ν
     ν1 = intrp10.ν
 
-    if !isfinite(intrp10) || !isfinite(intrp11)
+    if !isfinite(intrp10.tν) || !isfinite(intrp11.tν)
         # The transformation is unbounded at the outer edge so we have to extrapolate from the second to last point
         return InterpPoint(ν, cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ))
     elseif isnan(intrp00.∂tν_∂ν) || isnan(intrp00.∂tν_∂ζ) ||
