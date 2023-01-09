@@ -16,3 +16,5 @@ Return range with `n` added to beginning and end.
 function padded_range(a, n::Integer)
     (minimum(a)-n):(maximum(a)+n)
 end
+
+consecutive_pairs(r) = partition(r, 2, 1)
