@@ -131,6 +131,9 @@ function linear_interpolation(p0::InterpPoint, p1::InterpPoint, ν::Number)
     )
 end
 
+# First order Taylor series
+linear_extrapolation(x0, f0, df_dx0, x) = f0 + df_dx0*(x-x0)
+
 function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
 
     ν0=p0.ν; tν0=p0.tν; ∂tν_∂ν0=p0.∂tν_∂ν; ∂tν_∂ζ0=p0.∂tν_∂ζ
