@@ -285,3 +285,5 @@ function continue_in_ζ(field_fnc::Function, ζ::Number, tν0::InterpLine; house
         [continue_in_ζ(field_fnc, ζ, p; U_field, N_iter_max, householder_order, ε) for p in tν0.points]
     )
 end
+
+continue_in_ζ(u_pml::PMLFieldFunction, args...; kwargs...) = continue_in_ζ(u_pml.u, u_pml.pml, args...; kwargs...)
