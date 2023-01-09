@@ -31,6 +31,12 @@ end
 ∂tν_∂ν(u::NamedTuple, U::NamedTuple)::Complex = - U.u / u.∂u_∂tν
 ∂tν_∂ζ(u::NamedTuple, U::NamedTuple, ν::Number)::Complex = (U.∂u_∂tζ*(1-ν) - u.∂u_∂tζ) / u.∂u_∂tν
 
+struct PMLFieldFunction{F<:AbstractFieldFunction,P<:PMLGeometry}
+    u::F
+    pml::P
+end
+(u_pml::PMLFieldFunction)(derivs, ν, ζ) = u_pml.u(derivs, PMLCoordinates(ν, ζ), u_pml.pml)
+
 include("planar_wave.jl")
 
 include("planar_wave_series.jl")

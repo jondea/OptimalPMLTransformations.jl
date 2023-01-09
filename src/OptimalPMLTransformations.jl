@@ -46,6 +46,7 @@ export tr_and_jacobian
 export SFB
 
 export AbstractFieldFunction
+export PMLFieldFunction
 
 export ∂u_∂tr
 
