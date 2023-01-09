@@ -29,10 +29,10 @@ function Base.iterate(it::InterpPatchIterator, state)
 	# popping it to show it has been used. Interpolate by peeking forward for the other
 	if peek(state.intrp_points0).ν > peek(state.intrp_points1).ν
 		intrp11 = popfirst!(state.intrp_points1)
-		intrp10 = eval_hermite_patch(state.intrp00, peek(state.intrp_points0), intrp11.ν)
+		intrp10 = evaluate(InterpSegment(state.intrp00, peek(state.intrp_points0), it.intrp0.ζ), intrp11.ν)
 	elseif peek(state.intrp_points1).ν > peek(state.intrp_points0).ν
 		intrp10 = popfirst!(state.intrp_points0)
-		intrp11 = eval_hermite_patch(state.intrp01, peek(state.intrp_points1), intrp10.ν)
+		intrp11 = evaluate(InterpSegment(state.intrp01, peek(state.intrp_points1), it.intrp0.ζ), intrp10.ν)
 	else # Equal, use both
 		intrp10 = popfirst!(state.intrp_points0)
 		intrp11 = popfirst!(state.intrp_points1)
