@@ -26,6 +26,10 @@ struct InterpPatch
     ζ1::Float64
 end
 
+# Note that these both assume that the patch is well formed, that is p.p00.ν == p.p01.ν <= p.p10.ν == p.p11.ν
+νmin(p::InterpPatch) = p.p00.ν
+νmax(p::InterpPatch) = p.p11.ν
+
 import Base.zero
 zero(::Type{InterpPatch}) = InterpPatch(zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), 0, 0)
 
@@ -99,7 +103,7 @@ struct Dtν_ν
     ∂tν_∂ν::ComplexF64
 end
 
-Dtν_ν(p::InterpPoint) = Dtν_νζ(p.tν, p.∂tν_∂ν)
+Dtν_ν(p::InterpPoint) = Dtν_ν(p.tν, p.∂tν_∂ν)
 
 struct Dtν_νζ
     tν::ComplexF64
@@ -110,6 +114,7 @@ end
 Dtν_νζ(p::InterpPoint) = Dtν_νζ(p.tν, p.∂tν_∂ν, p.∂tν_∂ζ)
 
 InterpPoint(ν::Float64, d::Dtν_νζ) = InterpPoint(ν, d.tν, d.∂tν_∂ν, d.∂tν_∂ζ)
+InterpPoint(ν::Float64, d::Dtν_ν, ∂tν_∂ζ::Number) = InterpPoint(ν, d.tν, d.∂tν_∂ν, ∂tν_∂ζ)
 
 import Base.isnan
 isnan(p::InterpPoint) = isnan(p.ν) || isnan(p.tν) || isnan(p.∂tν_∂ν) || isnan(p.∂tν_∂ζ)
