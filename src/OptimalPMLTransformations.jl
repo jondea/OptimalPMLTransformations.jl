@@ -88,7 +88,10 @@ export continue_in_ζ
 export Rip
 export eval_hermite_patch
 
-export Rip2D, classify_outer_boundary, find_rips
+export Rip2D
+export find_rips
+export find_rips!
+export find_rip
 
 export gausslegendreunit,
        int_gauss,
