@@ -13,7 +13,7 @@ function integrate(intrp::InterpLine, f::Function; order=2)
         for (knot, weight) in zip(knots, weights)
             ν = intrp_prev.ν + knot * h
             # TODO: Implement eval_hermite_patch which takes knot directly
-            intrp_point = eval_hermite_patch(intrp_prev, intrp_next, ν)
+            intrp_point = evaluate(InterpSegment(intrp_prev, intrp_next, intrp.ζ), ν)
             integrand += f(intrp_point)*weight*h
         end
         intrp_prev = popfirst!(intrp_it)
