@@ -202,12 +202,12 @@ function line_integrate_hcubature(tν_interp0::InterpLine, tν_interp1::InterpLi
     @assert first(tν_interp0.points).ν == first(tν_interp1.points).ν
     @assert last(tν_interp0.points).ν == last(tν_interp1.points).ν
 
-    integral = zero(f(zero(InterpPatch), first(tν_interp0.points).ν, tν_interp0.ζ))
+    integral = zero(f(zero(InterpSegment), zero(InterpSegment), first(tν_interp0.points).ν))
 
     for patch in eachpatch(tν_interp0, tν_interp1)
-        I₋, _ = hcubature(ν->f(segment0(patch),ν), ν0, ν1; kwargs...)
-        I₊, _ = hcubature(ν->f(segment1(patch),ν), ν0, ν1; kwargs...)
-        integral += (I₊ - I₋)
+        # Given that these patches are cubic at most, we could just use a known number of Gauss points
+        # instead of an adaptive scheme. Of course we need an adaptive scheme if we use eval+correct
+        integral += hquadrature(ν->f(segment0(patch), segment1(patch),ν), νmin(patch), νmax(patch); kwargs...)[1]
     end
 
     return integral

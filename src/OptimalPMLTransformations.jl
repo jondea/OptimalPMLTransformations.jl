@@ -10,6 +10,7 @@ import InverseHankelFunction: invhankelh1n, diffinvhankelh1n, diffhankelh1
 import CubicHermiteSpline
 import CubicHermiteSpline: CubicHermiteSplineInterpolation
 import FastGaussQuadrature: gausslegendre
+import HCubature: hcubature, hquadrature
 import IterTools: partition
 
 "Tensor contraction of two vectors"
