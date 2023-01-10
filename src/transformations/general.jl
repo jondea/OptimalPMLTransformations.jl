@@ -53,7 +53,7 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     ∂tν_∂ν_vec::Union{Vector{Complex{T}},Nothing}=nothing,
     ∂tν_∂ζ_vec::Union{Vector{Complex{T}},Nothing}=nothing;
     ν0=zero(T), tν0=zero(Complex{T}), field0=field_fnc(tν0), U_field=field_fnc(zero(Complex{T})), householder_order=3, ε=1.0e-12,
-    show_trace=false, h_max=0.1, h_min=1e-12, tν_jump_max=0.5, t_angle_jump_max=π/8, N_iter_max=10, silent_failure=false) where {T<:Real}
+    h_max=0.1, h_min=1e-12, tν_jump_max=10.0, tν_correction_ratio_max=0.2, t_angle_jump_max=π/8, N_iter_max=10) where {T<:Real}
 
     # Last resort kill switch
     overall_iter = 0
@@ -73,7 +73,20 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         if !isnothing(∂tν_∂ζ_vec) push!(∂tν_∂ζ_vec, ∂tν_∂ζ(field,U_field,ν)) end
     end
 
-    ν = ν0
+    function ν_step(ν_prev, t, h_prev=Inf)::Tuple{T,T}
+        # Could we do tν_jump_max as relative to abs(tν)?
+        # Try to guess what will be a good size for the next step without going past our max
+        h = min(h_max, 0.9*tν_jump_max/abs(t), 2*h_prev)
+        ν = ν_prev + h
+        # If the step will almost take us to the end, just go straight there.
+        if (ν_max-ν) < (1 + sqrt(eps(ν_max)))*h_min
+            h = ν_max-ν_prev
+            ν = ν_max
+        end
+        return ν, h
+    end
+
+    ν::T = ν0
 
     tν = complex(tν0)
 
@@ -90,17 +103,14 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
     tν_prev = tν
     ν_prev  = ν
-
-    # Could we do tν_jump_max as relative to abs(tν)?
-    # Try to guess what will be a good size for the next step without going past our max
-    h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν)
+    ν, h = ν_step(ν, t)
 
     # Store h_prev for a kind of momentum, we half the failed step when things are bad,
     # but we at most double the previous when things look better
     h_prev = h
 
     # Keep going until we get to our target
-    while ν < ν_max
+    while ν_prev < ν_max
 
         if isnan(h)
             error("step (h) is nan, cannot continue stepping")
@@ -109,46 +119,20 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         # Last resort break to stop infinite loop
         overall_iter += 1
         if overall_iter > 10000
-            if silent_failure
-                tν = T(NaN) + im*T(NaN)
-                field = field_fnc(tν)
-                push_trace_vectors(ν, tν, field)
-                break
-            else
-                error("Too many steps overall, quitting")
-            end
-        end
-
-        # Step in ν
-        ν = ν_prev + h
-
-        # If we are so close that the next step will be too small, just go right to ν_max
-        if abs(ν - ν_max) < h_min
-            ν = ν_max
-            h = ν  - ν_prev
-        end
-
-        # Stepsize is too small, give up and mark end as NaN
-        if h < h_min
-            if silent_failure
-                ν = ν_max
-                tν = T(NaN) + im*T(NaN)
-                field = field_fnc(tν)
-                push_trace_vectors(ν, tν, field)
-                break
-            else
-                error("Step size is smller than minimum, quitting")
-            end
+            # This shouldn't happen, the step size checker should have caught this
+            # throw a noisy error and fix it!
+            error("Too many steps overall, quitting")
         end
 
         # Predictor step in tν using tangent (Euler)
-        tν = tν_prev + h*t
+        tν_pred = tν_prev + h*t
+        tν = tν_pred
 
         # Evaluate field at new estimate
         field = field_fnc(tν)
 
         # Corrector iterations
-        tν, field, converged = corrector(field_fnc, U, ν, tν, field; N_iter_max, householder_order)
+        tν, field, converged = corrector(field_fnc, U, ν, tν, field; N_iter_max, householder_order, ε)
 
         # Get tangent at new point
         t = ∂tν_∂ν(field, U_field)
@@ -160,9 +144,14 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
         # Only accept this stepsize if the tangent and value hasn't changed too much
         if (   t_angle_jump <= t_angle_jump_max
             && abs(tν-tν_prev) <= tν_jump_max
+            && abs(tν-tν_pred)/abs(tν_pred - tν_prev) <= tν_correction_ratio_max
             && converged )
 
             push_trace_vectors(ν, tν, field)
+
+            if ν == ν_max
+                break
+            end
 
             # Store current as the starting point for next step
             field_prev = field
@@ -171,22 +160,20 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
             tν_prev = tν
             h_prev = h
 
-            # Reset stepsize, try to guess what will be a good size for the next step without going past our max
-            h = min(h_max, 0.9*tν_jump_max/abs(t), ν_max-ν, 2*h_prev)
-        else
-            # TODO: make these log at debug level
-            # print("Rejecting at $ν, reasons: ")
-            # if !(t_angle_jump <= t_angle_jump_max)
-            #     print("t_angle_jump too big: $t_angle_jump ")
-            # end
-            # if !(abs(tν-tν_prev) <= tν_jump_max)
-            #     print("abs(tν-tν_prev) too big: $(abs(tν-tν_prev)) ")
-            # end
-            # if !(converged)
-            #     print("not converged ")
-            # end
+            ν, h = ν_step(ν, t, h_prev)
 
-            # println("")
+        else
+
+            @debug "Rejecting at ν=$ν, h=$h, overall_iter=$overall_iter reasons: "
+            if !(t_angle_jump <= t_angle_jump_max)
+                @debug "    t_angle_jump too big: $t_angle_jump "
+            end
+            if !(abs(tν-tν_prev) <= tν_jump_max)
+                @debug "    abs(tν-tν_prev) too big: $(abs(tν-tν_prev)) "
+            end
+            if !(converged)
+                @debug "    not converged "
+            end
 
             # Reject the step and reduce step size
             # Go back to previous
@@ -197,6 +184,18 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
 
             # Half the size of h
             h = h/2
+            ν = ν + h
+        end
+
+        # Stepsize is too small, give up and mark end as NaN
+        # This is expected if the transformation is unbounded at the outer edge
+        # so we don't throw
+        if h < h_min
+            ν = ν_max
+            tν = T(NaN) + im*T(NaN)
+            field = field_fnc(tν)
+            push_trace_vectors(ν, tν, field)
+            break
         end
 
     end
@@ -204,59 +203,6 @@ function optimal_pml_transformation_solve(field_fnc::Function, ν_max::T,
     return tν, ∂tν_∂ν(field,U_field), ∂tν_∂ζ(field,U_field,ν), ν, field
 end
 
-function pole_newton_solve(u::AbstractFieldFunction, pml::PMLGeometry, args...; kwargs...)
-    u_pml_coords(tν,ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
-    return pole_newton_solve(u_pml_coords, args...;kwargs...)
-end
-
-function pole_newton_solve(field_fnc::Function, ν0::Real, ζ0::Real, tν0::Number; ε=1e-12)
-
-    ν = ν0
-    ζ = ζ0
-    tν = tν0
-
-    x = [ν, ζ, real(tν), imag(tν)]
-
-    # Objectives, normalised by u
-    f1(field::NamedTuple) = field.∂u_∂tν
-    f2(field::NamedTuple, ν) = (field.u - U_field.u*(1-ν))
-
-    U_field = field_fnc(0.0+0.0im, ζ)
-    field = field_fnc(tν, ζ)
-
-    # Create vector of residuals
-    r = [real(f1(field)), imag(f1(field)), real(f2(field,ν)), imag(f2(field,ν))]
-
-    counter = 1
-    while maximum(abs.(r)) > ε*abs(U_field.u)
-
-        # Create Jacobian of objectives and unknowns
-        df2_dζ = field.∂u_∂tζ-U_field.∂u_∂tζ*(1-ν)
-        J = [
-            0               real(field.∂2u_∂tν∂tζ) real(field.∂2u_∂tν2) -imag(field.∂2u_∂tν2);
-            0               imag(field.∂2u_∂tν∂tζ) imag(field.∂2u_∂tν2)  real(field.∂2u_∂tν2);
-            real(U_field.u) real(df2_dζ)          real(field.∂u_∂tν)   -imag(field.∂u_∂tν)  ;
-            imag(U_field.u) imag(df2_dζ)          imag(field.∂u_∂tν)    real(field.∂u_∂tν)
-        ]
-
-        # Perform Newton step
-        x = x - J\r
-
-        # Get values of unknowns from vector
-        ν = x[1]
-        ζ = x[2]
-        tν = x[3] + im*x[4]
-
-        # Recompute field and residual at new point
-        U_field = field_fnc(0.0+0.0im, ζ)
-        field = field_fnc(tν, ζ)
-        r = [real(f1(field)), imag(f1(field)), real(f2(field,ν)), imag(f2(field,ν))]
-
-        counter += 1
-    end
-
-    return ν, ζ, tν
-end
 
 "Continue from p0 to ζ"
 function continue_in_ζ(field_fnc::Function, ζ::Number, p0::InterpPoint;
