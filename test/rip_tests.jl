@@ -14,8 +14,8 @@ using Tau
         k = 1.0
         a = two_mode_pole_coef(0:1, 2.0+1.0im)
         u = HankelSeries(k, a)
-        u_pml_coords(tν, tζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,tζ), pml)
-        rips = classify_outer_boundary(u_pml_coords, θ₋, θ₊; Nζ=101, ε=1e-5, δ=1e-1, verbose=true)
+        u_pml = PMLFieldFunction(u, pml)
+        rips = find_rips(u_pml, range(θ₋,θ₊,length=101))
         @test length(rips) == 2
     end
 
@@ -23,8 +23,8 @@ using Tau
         k = 0.1
         a = scattered_coef(-10:10, k)
         u = HankelSeries(k, a)
-        u_pml_coords(tν, tζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,tζ), pml)
-        rips = classify_outer_boundary(u_pml_coords, θ₋, θ₊; Nζ=101, ε=1e-5, δ=1e-1, verbose=true)
+        u_pml = PMLFieldFunction(u, pml)
+        rips = find_rips(u_pml, range(θ₋,θ₊,length=101))
         @test length(rips) == 4
         @test all([rips[1].ν, rips[4].ν] .≈ 0.99998500527112)
         @test all([rips[2].ν, rips[3].ν] .≈ 0.7028136109896637)
@@ -39,8 +39,8 @@ using Tau
         k = 1.0
         a = scattered_coef(-10:10, k)
         u = HankelSeries(k, a)
-        u_pml_coords(tν, tζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,tζ), pml)
-        rips = classify_outer_boundary(u_pml_coords, θ₋, θ₊; Nζ=101, ε=1e-5, δ=1e-1, verbose=true)
+        u_pml = PMLFieldFunction(u, pml)
+        rips = find_rips(u_pml, range(θ₋,θ₊,length=101))
         @test length(rips) == 0
     end
 
