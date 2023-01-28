@@ -213,7 +213,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
                     Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
                     Jₜᵣᵣ = inv(J_pml)
-                    dtx_dtr = Tensors.Vec{2}(-sin(θ), cos(θ))
+                    dtx_dtr = Tensors.Vec(-sin(θ), cos(θ))
                     for i in 1:n_basefuncs
                         # Shape function is defined on face, we use ν to extend into the collapsed PML
                         δU = shape_value(pml_cellvalues, 1, i)
@@ -239,7 +239,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                     tν₋ = last(region1.lines)
                     tν₊ = first(region2.lines)
                     jump_integrand(segment0, segment1, ν) = line_integrand(segment0,ν) - line_integrand(segment1,ν)
-                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-12, rtol=1e-10, maxevals=10_000)
+                    # Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-12, rtol=1e-10, maxevals=10_000)
+                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-6, rtol=1e-8, maxevals=1_000)
                 end
             end
         end
