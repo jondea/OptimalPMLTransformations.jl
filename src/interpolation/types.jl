@@ -30,6 +30,9 @@ end
 νmin(p::InterpPatch) = p.p00.ν
 νmax(p::InterpPatch) = p.p11.ν
 
+ζmin(p::InterpPatch) = p.ζ0
+ζmax(p::InterpPatch) = p.ζ1
+
 import Base.zero
 zero(::Type{InterpPatch}) = InterpPatch(zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), 0, 0)
 
