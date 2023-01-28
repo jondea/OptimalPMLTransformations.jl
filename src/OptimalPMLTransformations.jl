@@ -69,7 +69,8 @@ export InvHankelSeriesPML
 export add_interpolation!
 export has_interpolation
 
-export interpolate,
+export adaptively_append!
+export interpolation,
        InterpPoint,
        InterpLine,
        ContinuousInterpolation,
@@ -108,6 +109,7 @@ export integrate
 export integrate_hcubature
 export integrate_between
 export integrate_quad
+export line_integrate_hcubature
 
 export optimal_pml_transformation_solve
 

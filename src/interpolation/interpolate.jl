@@ -1,98 +1,69 @@
 
 
-function interpolate(u::AbstractFieldFunction, pml::PMLGeometry, ζs, ν_max; δ = 1e-1, ε = 1e-4, kwargs...)
+"Adaptively append interpolation lines to the interpolation, between first(ζs) and last(ζs) (not including end points)"
+function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector;
+	ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference,
+	tν₊=interpolation(u_pml, last(ζs)))::Interpolation
 
-    function create_line(ζ)
-        ν_vec = Float64[]
-        tν_vec = ComplexF64[]
-        ∂tν_∂ν_vec = ComplexF64[]
-        ∂tν_∂ζ_vec = ComplexF64[]
-        optimal_pml_transformation_solve(u, pml, ν_max, ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec; silent_failure=true, kwargs...)
-        # Add in point at ν=1? Try to work out if it's unbounded or not
-        return InterpLine(ζ, ν_vec, tν_vec, ∂tν_∂ν_vec, ∂tν_∂ζ_vec)
-    end
+	tν₁ = last(last(intrp.continuous_region).lines)
+	for (ζ₁, ζ₂) in consecutive_pairs(ζs)
+		tν₂ = (ζ₂ == last(ζs)) ? tν₊ : interpolation(u_pml, ζ₂)
+		if tν_metric(tν₁,tν₂) > ε
+			if abs(ζ₂ - ζ₁) < δ
+				# Find rip point accurately using Newton's method
+				rip = find_rip(u_pml, tν₁, tν₂)
 
-    function possible_rip_between(line1::InterpLine, line2::InterpLine)::Bool
-        knots = 0:0.01:ν_max
-        line1_points = line1.(knots)
-        line2_points = line2.(knots)
-        rel_diff = (2*norm(line1_points - line2_points)
-            /(norm(line1_points) + norm(line2_points)))
-        return rel_diff > δ
-    end
+				# Rip has unbounded derivatives in ν and ζ, add NaNs
+				rip_interp_point = InterpPoint(rip.ν, rip.tν, NaN+im*NaN, NaN+im*NaN)
 
-    function recursively_subdivide(intrp, previous_line, next_line)
-        ζ_mid = (previous_line.ζ + next_line.ζ)/2
+				# Add line on rip, continued from below
+				tν_rip₋ = continue_in_ζ(u_pml, rip.ζ, tν₁)
+				insertsorted!(tν_rip₋.points, rip_interp_point; by=p->p.ν)
+				push!(intrp, tν_rip₋)
 
-        # We have to stop at some point and accept there's a rip
-        if abs(previous_line.ζ - next_line.ζ) < ε
-            p_rip₋ = argmax(p->abs(p.∂tν_∂ν)*(1-p.ν), previous_line.points)
-            p_rip₊ = argmax(p->abs(p.∂tν_∂ν)*(1-p.ν), next_line.points)
+				# Adding a rip severs the two continuous regions
+				push!(intrp, Rip(rip.ζ))
 
-            ν_rip = (p_rip₋.ν + p_rip₊.ν)/2
-            tν_rip = (p_rip₋.tν + p_rip₊.tν)/2
-            ζ_rip = ζ_mid
+				# Add line on rip, continued from above
+				tν_rip₊ = continue_in_ζ(u_pml, rip.ζ, tν₂)
+				insertsorted!(tν_rip₊.points, rip_interp_point; by=p->p.ν)
+				push!(intrp, tν_rip₊)
+			else
+				# Recursively split domain into 2 regions (3 points with ends)
+				adaptively_append!(intrp, u_pml, range(ζ₁, ζ₂, length=3); ε, δ, tν₊=tν₂)
+			end
+		end
+		# Don't add interpolation on the last ζ, or we'd add duplicates all up the call stack
+		if ζ₂ != last(ζs)
+			push!(intrp, tν₂)
+		end
+		tν₁ = tν₂
+	end
 
-            ε_newton = 1e-12
-            ν_rip, ζ_rip, tν_rip = pole_newton_solve(u, pml, ν_rip, ζ_mid, tν_rip; ε=ε_newton)
+	return intrp
+end
 
-            rip_interp_point = InterpPoint(ν_rip, tν_rip, NaN+im*NaN, NaN+im*NaN)
+"""
+Find interpolation of `u_pml` at all ζs, adapting in ν and ζ
 
-            # Continue from the previous line to exactly on the rip, this should capture the boundary on
-            # this side of the rip and will be the last line in the continuous region
-            rip_line₋ = continue_in_ζ(u, pml, ζ_rip, previous_line)
+Subdivide in ζ if the tν_metric between two consecutive lines is >ε.
+Add a rip if the division in ζ is <δ.
+"""
+function interpolation(u_pml::PMLFieldFunction, ζs::AbstractVector; kwargs...)::Interpolation
 
-            if possible_rip_between(previous_line, rip_line₋) error("ARGGGHH") end
+	# Start off interpolation with the first ζ
+	tν₋ = interpolation(u_pml, first(ζs))
+	intrp = Interpolation(tν₋)
 
-            # Add the rip as a point, so that we can work around it later
-            insertsorted!(rip_line₋.points, rip_interp_point; by=p->p.ν)
+	# Compute the interpolation at the last point and pass in for efficiency
+	tν₊ = interpolation(u_pml, last(ζs))
+	adaptively_append!(intrp, u_pml, ζs; tν₊, kwargs...)
 
-            push!(intrp, rip_line₋)
+	# Now we've done adaptively appending to the interpolation, add the final interpolation line
+	push!(intrp, tν₊)
 
-            # Add new rip, implicitly creating new continuous region
-            push!(intrp, Rip(ζ_rip))
+	return intrp
 
-            # Continue from the next line to exactly on the rip, this should capture the boundary on
-            # the other side of the rip, which will be the first line of the next continuous region
-            rip_line₊ = continue_in_ζ(u, pml, ζ_rip, next_line)
-
-            # Add the rip as a point, so that we can work around it later
-            insertsorted!(rip_line₊.points, rip_interp_point; by=p->p.ν)
-
-            push!(intrp, rip_line₊)
-
-            return
-        end
-
-        mid_line = create_line(ζ_mid)
-
-        if possible_rip_between(previous_line, mid_line)
-            recursively_subdivide(intrp, previous_line, mid_line)
-        end
-
-        # When we get to this point, we have subdivided everything before the mid_line
-        push!(intrp, mid_line)
-
-        if possible_rip_between(mid_line, next_line)
-            recursively_subdivide(intrp, mid_line, next_line)
-        end
-    end
-
-    ζ_iter = Base.Iterators.Stateful(ζs)
-    ζ = popfirst!(ζ_iter)
-    previous_line = create_line(ζ)
-    intrp = Interpolation(previous_line)
-
-    for ζ in ζ_iter
-        next_line = create_line(ζ)
-        recursively_subdivide(intrp, previous_line, next_line)
-        push!(intrp, next_line)
-        previous_line = next_line
-    end
-
-    last(intrp.continuous_region).ζ₊ = last(ζs)
-
-    return intrp
 end
 
 function interpolation(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0, kwargs...)
@@ -134,6 +105,7 @@ end
 # First order Taylor series
 linear_extrapolation(x0, f0, df_dx0, x) = f0 + df_dx0*(x-x0)
 
+# This handles nans, but the other evaluates don't, probably should be consistent here
 function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
 
     ν0=p0.ν; tν0=p0.tν; ∂tν_∂ν0=p0.∂tν_∂ν; ∂tν_∂ζ0=p0.∂tν_∂ζ

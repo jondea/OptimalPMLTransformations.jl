@@ -178,8 +178,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                     return Ke
                 end
 
-                ν_max = 1.0
-                intrp = interpolate(pml.u, pml.geom, range(θ_min, θ_max, length=3), ν_max; h_min=1e-8)
+                intrp = interpolation(PMLFieldFunction(pml), range(θ_min, θ_max, length=3))
 
                 # If we have an actual PML element, we need to constrain dofs on
                 # outer boundary I think that because Ferrite imposes BCs after
@@ -190,10 +189,12 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # doesn't fix the linear profile, that would require us to
                 # implement a new element, which might throw off the
                 # isoparametric stuff)
-                Ke += integrate_hcubature(intrp, contribution; atol=1e-12, rtol=1e-10, maxevals=10_000)
+
+                # Ke += integrate_hcubature(intrp, contribution; atol=1e-12, rtol=1e-10, maxevals=1_000)
+                Ke += integrate_hcubature(intrp, contribution; atol=1e-8, rtol=1e-6, maxevals=1_000)
 
                 # Used inside integrate_hcubature
-                function jump_contribution(segment, ν)
+                function line_integrand(segment, ν)
                     ζ = segment.ζ
                     (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
 
@@ -237,7 +238,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 for (region1, region2) in consecutive_pairs(intrp.continuous_region)
                     tν₋ = last(region1.lines)
                     tν₊ = first(region2.lines)
-                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_contribution; atol=1e-12, rtol=1e-10, maxevals=10_000)
+                    jump_integrand(segment0, segment1, ν) = line_integrand(segment0,ν) - line_integrand(segment1,ν)
+                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-12, rtol=1e-10, maxevals=10_000)
                 end
             end
         end

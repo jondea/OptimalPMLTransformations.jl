@@ -12,8 +12,8 @@ k = 1.0
 a = two_mode_pole_coef(0:1, 2.0+1.0im)
 u = HankelSeries(k, a)
 
-intrp = interpolate(u, pml, range(-τ/8, τ/8, length=11), 0.999; ε=1e-8);
-# intrp = interpolate(u, pml, range(0.5, 0.55, length=2), 0.999; ε=1e-8);
+intrp = interpolation(u, pml, range(-τ/8, τ/8, length=11), 0.999; ε=1e-8);
+# intrp = interpolation(u, pml, range(0.5, 0.55, length=2), 0.999; ε=1e-8);
 
 integrand(ν::Number, ∂tν_∂ν::Number) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂tν_∂ν
 integrand(p::InterpPoint) = integrand(p.ν, p.∂tν_∂ν)

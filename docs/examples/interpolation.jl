@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.19.14
 
 using Markdown
 using InteractiveUtils
@@ -290,7 +290,7 @@ md"""
 
 # ╔═╡ 6a9a44c6-83e0-4756-941b-7e271756d4f3
 function interpolate_and_plot(u::AbstractFieldFunction, pml::PMLGeometry, seriestype::Symbol, νs::AbstractVector, ζs; f=(l,ν)->l(ν), kwargs...)
-	intrp = interpolate(u, pml, ζs, maximum(νs))
+	intrp = interpolation(u, pml, ζs, maximum(νs))
 	plot()
 	for region in intrp.continuous_region
 		intrp_grid = [f(line, ν) for line in region.lines, ν in νs]
@@ -342,7 +342,7 @@ begin
 		u::F
 		pml::P
 	end
-	(u_pml::PMLFieldFunction)(NT, ν, ζ) = u_pml.u(NT, PMLCoordinates(ν, ζ), u_pml.pml)
+	(u_pml::PMLFieldFunction)(derivs, ν, ζ) = u_pml.u(derivs, PMLCoordinates(ν, ζ), u_pml.pml)
 end
 
 # ╔═╡ 8e497f14-8f77-45b9-8843-bc65e20a61d5
@@ -500,7 +500,7 @@ OptimalPMLTransformations.continue_in_ζ(u_pml, args...; kwargs...) = continue_i
 # ╔═╡ 76701429-c0dd-454e-98fd-4e27a097898b
 begin
 	import Base: argmax
-	function argmax(f::Function, l1::InterpLine, l2::InterpLine)
+	function Base.argmax(f::Function, l1::InterpLine, l2::InterpLine)
 		f1, i1 = findmax(f, l1.points)
 		f2, i2 = findmax(f, l2.points)
 		f1 < f2 ? (l1, l1.points[i1]) : (l2, l2.points[i2])
@@ -584,7 +584,7 @@ let
 
 	tν_vec = [p.tν for p in tν.points]
 	ν_vec = [p.ν for p in tν.points]
-	
+
 	ν_vec_plot = 0:0.001:ν_max
 	complex2cols(c) = [real.(c) imag.(c)]
 
@@ -668,7 +668,7 @@ function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::
 
 				# Rip has unbounded derivatives in ν and ζ, add NaNs
 				rip_interp_point = InterpPoint(rip.ν, rip.tν, NaN+im*NaN, NaN+im*NaN)
-				
+
 				# Add line on rip, continued from below
 				tν_rip₋ = continue_in_ζ(u_pml, rip.ζ, tν₁)
 				insertsorted!(tν_rip₋.points, rip_interp_point; by=p->p.ν)

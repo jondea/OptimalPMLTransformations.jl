@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.19.14
 
 using Markdown
 using InteractiveUtils
@@ -62,13 +62,13 @@ u = HankelSeries(k, a)
 
 # ╔═╡ cf33a317-42ac-40cf-93a1-108710869ed7
 u_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)},
-	PMLCoordinates(tν,ζ), pml) 
+	PMLCoordinates(tν,ζ), pml)
 
 # ╔═╡ b8ce3309-982c-4bb3-acff-cab1cddcb447
-intrp = interpolate(u, pml, range(-τ/8, τ/8, length=11), 0.999; ε=1e-8)
+intrp = interpolation(u, pml, range(-τ/8, τ/8, length=11), 0.999; ε=1e-8)
 
 # ╔═╡ 78bbf375-d069-4181-8115-a10815dba3aa
-intrp2 = interpolate(u, pml, range(τ/8, 2τ/8, length=3), 1.0; ε=1e-8)
+intrp2 = interpolation(u, pml, range(τ/8, 2τ/8, length=3), 1.0; ε=1e-8)
 
 # ╔═╡ 78dded32-70ea-4b06-a520-02865f710c8a
 intrp2.continuous_region
@@ -94,7 +94,7 @@ TODO
 - Whats happening at infinity?
 - Can we solve for the integrand and avoid infinity altogether?
 - Compare performance with the old transformed integration method
-- Move to a vectorised Hankel function method? CRBond 
+- Move to a vectorised Hankel function method? CRBond
 """
 
 # ╔═╡ 037c12df-5bb3-40c2-892e-09afcdb27569
@@ -126,10 +126,10 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 	ζ_crit = only(rips).ζ
 
 	ζ_width = ζ_range[2]-ζ_range[1]
-	
+
 	# Find singularity
 	s_crit = ((ζ_crit - ζ_range[1])/ζ_width, ν_crit)
-	
+
 	# Get Gauss-Legendre knot points and weights, and transform to [0,1]
 	nodes, weights = gausslegendre(integration_order)
 	nodes .= (nodes .+ 1)/2
@@ -154,7 +154,7 @@ function integrate_trans_gauss(u, pml, ν_range, ζ_range, integration_order)
 			ν = trans_node[2]
 			tν, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field = optimal_pml_transformation_solve(field_fnc_ν, ν; 					ν0=ν_prev, tν0=tν_prev, field0=field, U_field=U_field, householder_order=3)
 			integral += trans_weight*integrand(ν, ∂tν_∂ν)*ζ_width
-			
+
 			n_knot += 1
 			ν_prev = ν
 			tν_prev = tν
@@ -194,21 +194,21 @@ function integrate_trans_gauss_old(n)
 		U_field = field_fnc_ν(0.0+0.0im)
 		return 0.0, 0.0 + 0.0im, field_fnc_ν, U_field
 	end
-	
+
 	function step_and_integrand!()
 		tν_prev, ∂tν_∂ν, ∂tν_∂ζ, ν_prev, field_prev = exact_mapping_solve_adaptive_steps(field_fnc, ν; 					ν0=ν_prev, tν0=tν_prev, field0=field_prev, U_field=U_field, householder_order=3)
 		integral += weight*integrand(ν, ∂tν_∂ν)
 	end
-	
+
 	# Step through PML, adding contributions to integral
 	for (ν, weight) in zip(nodes, weights)
 		initiailise(ζ, field_fnc_νζ)
-		
+
 		for (ν, weight) in zip(nodes, weights)
 		end
 		for (ν, weight) in zip(nodes, weights)
 		end
-		
+
 	end
 	return integral
 end
@@ -226,7 +226,7 @@ let
 
 	# f(ν,ζ) = imag(OptimalPMLTransformations.evaluate(patch,ζ0,ζ1,ν,ζ).tν)
 	f(ν,ζ) = imag(OptimalPMLTransformations.evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ).tν)
-	
+
 	surface(range(ν0,ν1,length=100), range(ζ0,ζ1,length=100), f)
 	(ζ0 - ζ1,  ν0 - ν1)
 end
@@ -292,19 +292,19 @@ plot(region1)
 # ╔═╡ 4de66add-1ab6-43c8-9ca5-a48435a6701e
 let
 	line1 = deepcopy(region1.lines[1])
-	
+
 	num_points = Int[]
 	vals = ComplexF64[]
-	
+
 	push!(num_points, length(line1.points))
 	push!(vals, integrate(line1, integrand; order=int_order))
-	
+
 	for _ in 1:8
 	    refine!(line1, u, pml)
 	    push!(num_points, length(line1.points))
 	    push!(vals, integrate(line1, integrand; order=int_order))
 	end
-	
+
 	plot(num_points[1:end-1], abs.(vals[1:end-1] .- vals[end]), scale=:log10)
 end
 
@@ -312,7 +312,7 @@ end
 let
 	num_points = Int[]
 	vals = ComplexF64[]
-	
+
 	region_refined_in_ζ = deepcopy(intrp.continuous_region[1])
 	for i in 0:2
 		if i!= 0
@@ -326,7 +326,7 @@ let
 	    push!(num_points, total_points)
 	    push!(vals, integrate(region, integrand; order=int_order))
 	end
-	
+
 	plot(num_points[1:end-1], abs.(vals[1:end-1] .- vals[end]), scale=:log10), num_points, vals
 end
 

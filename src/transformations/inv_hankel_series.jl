@@ -16,10 +16,12 @@ end
 
 InvHankelSeriesPML(geom, u) = InvHankelSeriesPML(geom, u, Interpolation())
 
+PMLFieldFunction(pml::InvHankelSeriesPML) = PMLFieldFunction(pml.u, pml.geom)
+
 # Note, we can set the default range to [0,τ] because an Annular PML is a full turn.
 # ν_max=1 means we attempt to set the whole PML region
 function add_interpolation!(p::InvHankelSeriesPML; num_ζs=11, ζs = range(0.0, τ, length=num_ζs), ν_max=1.0, kwargs...)
-    p.interp = interpolate(p.u, p.geom, ζs, ν_max; kwargs...)
+    p.interp = interpolation(p.u, p.geom, ζs, ν_max; kwargs...)
 end
 
 has_interpolation(p::InvHankelSeriesPML) = !isempty(p.interp)
