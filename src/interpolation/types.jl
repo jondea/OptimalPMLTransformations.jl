@@ -33,6 +33,10 @@ end
 ζmin(p::InterpPatch) = p.ζ0
 ζmax(p::InterpPatch) = p.ζ1
 
+area(i::InterpPatch) = (i.ζ1 - i.ζ0)*(i.p11.ν - i.p00.ν)
+measure(s::InterpPatch) = abs(s.p1.ν - s.p0.ν)
+
+
 import Base.zero
 zero(::Type{InterpPatch}) = InterpPatch(zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), zero(InterpPoint), 0, 0)
 
@@ -41,6 +45,8 @@ struct InterpSegment
     p1::InterpPoint
     ζ::Float64
 end
+
+measure(s::InterpSegment) = s.p1.ν - s.p0.ν
 
 Base.zero(::Type{InterpSegment}) = InterpSegment(zero(InterpPoint), zero(InterpPoint), 0)
 segment0(p::InterpPatch) = InterpSegment(p.p00, p.p10, p.ζ0)
