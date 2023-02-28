@@ -304,7 +304,7 @@ csv_header(t::DataType) = join(string.(fieldnames(t)),',')
     return :(join($ex,','))
 end
 
-function solve(params::PMLHelmholtzPolarAnnulusParams)
+function solve(params::PMLHelmholtzPolarAnnulusParams; save_vtk=false)
     result = Result()
     dim=2
 
@@ -335,6 +335,10 @@ function solve(params::PMLHelmholtzPolarAnnulusParams)
     result.abs_sq_error = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u - u_ana(x))^2, u, cellvalues, dh)
     result.abs_sq_norm = integrate_solution((u,x)-> x∈pml ? 0.0 : abs(u)^2, u, cellvalues, dh)
     result.rel_error = sqrt(result.abs_sq_error/result.abs_sq_norm)
+
+    if save_vtk
+        write_vtk("helmholtz", dh, u, u_ana)
+    end
 
     return result
 end
