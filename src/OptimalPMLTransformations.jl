@@ -11,7 +11,7 @@ import CubicHermiteSpline
 import CubicHermiteSpline: CubicHermiteSplineInterpolation
 import FastGaussQuadrature: gausslegendre
 import HCubature: hcubature, hquadrature
-import IterTools: partition
+import IterTools: partition, firstrest
 
 "Tensor contraction of two vectors"
 contract(x::AbstractVector, y::AbstractVector) = mapreduce(*, +, x, y)
