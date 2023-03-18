@@ -199,8 +199,7 @@ function line_integrate_hcubature(tν_interp::InterpLine, f::Function; kwargs...
         # Given that these patches are cubic at most, we could just use a known number of Gauss points
         # instead of an adaptive scheme. Of course we need an adaptive scheme if we use eval+correct
         segment = InterpSegment(point_tuple[1], point_tuple[2], ζ)
-        integral = hquadrature(ν->f(segment, ν), νmin(segment), νmax(segment); kwargs...)[1]
+        integral += hquadrature(ν->f(segment, ν), νmin(segment), νmax(segment); kwargs...)[1]
     end
-
     return integral
 end
