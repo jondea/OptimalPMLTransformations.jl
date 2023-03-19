@@ -45,8 +45,6 @@ u(h::HankelSeries,θ::Number,H::AbstractVector)        = sum(n -> h.a[n] * exp(i
     return parsed_src
 end
 
-truenamedtuple(nt) = nt(ntuple(_->true, length(nt.body.parameters[1])))
-
 padding_needed(::Type{NamedTuple{(:u,)}}) = Val{0}()
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tθ)}}) = Val{0}()
 padding_needed(::Type{NamedTuple{(:∂u_∂tr,)}}) = Val{1}()
@@ -58,7 +56,7 @@ padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, 
 padding_needed(::Type{NamedTuple{(:u, :∂u_∂tr, :∂u_∂tθ, :∂2u_∂tr2, :∂3u_∂tr3)}}) = Val{3}()
 
 function (f::HankelSeries)(nt::Type{T}, p::PolarCoordinates) where T<:NamedTuple
-    eval_hankel(f, truenamedtuple(nt), p, padding_needed(nt))
+    eval_hankel(f, T((;u=1, ∂u_∂tr=1, ∂u_∂tθ=1, ∂2u_∂tr2=1, ∂2u_∂tr∂tθ=1, ∂3u_∂tr3=1)), p, padding_needed(nt))
 end
 
 function (f::HankelSeries)(p::PolarCoordinates)
