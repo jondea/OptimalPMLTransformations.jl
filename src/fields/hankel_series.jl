@@ -12,37 +12,61 @@ end
 
 function padded_hankelh1_vec(indices, z, padding)
     n_vec = padded_range(indices, padding)
-    return OffsetVector(hankelh1.(n_vec, z), n_vec)
+
+    pos_n_vec = max(n_vec.start,0,-n_vec.stop):max(-n_vec.start,0,n_vec.stop) # == minimum(abs,n_vec):maximum(abs,n_vec)
+    pos_h = hankelh1_seq(pos_n_vec, z)
+    # This is quite hot, could be smarter about this
+    return OffsetVector(map(n->(n%2==0 ? one(n) : sign(n))*pos_h[abs(n)], n_vec), n_vec)
 end
 
-u(h::HankelSeries,θ::Number,H::AbstractVector)        = sum(n -> h.a[n] * exp(im*θ*n) *               H[n], eachindex(h.a))
-∂u_∂tr(h::HankelSeries,θ::Number,H::AbstractVector)   = sum(n -> h.a[n] * exp(im*θ*n) * h.k*         (H[n-1] - H[n+1])/2, eachindex(h.a))
-∂2u_∂tr2(h::HankelSeries,θ::Number,H::AbstractVector) = sum(n -> h.a[n] * exp(im*θ*n) * h.k*h.k*     (H[n-2] - 2*H[n] + H[n+2])/4, eachindex(h.a))
-∂3u_∂tr3(h::HankelSeries,θ::Number,H::AbstractVector) = sum(n -> h.a[n] * exp(im*θ*n) * h.k*h.k*h.k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8, eachindex(h.a))
+# Taken from https://github.com/JuliaMath/SpecialFunctions.jl/pull/91
+# Boaz Blankrot (bblankrot) and modified
+function hankelh1_seq(P::UnitRange, z)
+    v = OffsetVector{typeof(complex(z))}(undef, P)
+    Hₚ₋₂ = hankelh1(first(P)-1, z)
+    Hₚ₋₁ = hankelh1(first(P), z)
+    v[first(P)] = Hₚ₋₁
+    for p in firstrest(P)[2]
+        Hₚ = (2*(p-1)/z)*Hₚ₋₁ - Hₚ₋₂
+        v[p] = Hₚ
+        Hₚ₋₂ = Hₚ₋₁; Hₚ₋₁ = Hₚ
+    end
+    return v
+end
 
-∂u_∂tθ(h::HankelSeries,θ,H)     = sum(n -> h.a[n] * im*n*exp(im*θ*n) *     H[n], eachindex(h.a))
-∂2u_∂tr∂tθ(h::HankelSeries,θ,H) = sum(n -> h.a[n] * im*n*exp(im*θ*n) * h.k* (H[n-1] - H[n+1])/2, eachindex(h.a))
-
-@generated function eval_hankel(h, NT, p, order_valtype)>
+@generated function eval_hankel(h, NT, p, order_valtype)
 
     tuple_symbols = collect(NT.parameters[1])
     order = order_valtype.parameters[1]
 
-    parsed_src = Meta.parseall("""
-    r = p.r
-    θ = p.θ
-    k = h.k
-    a = h.a
-    if isnan(k*r)
-        cnan = (1 + im)*typeof(k*r)(NaN)
-        return (;$(join(["$s = cnan" for s in tuple_symbols],',')))
-    end
+    deriv_expr = Dict(
+        :u          => quote a_n_exp_iθn *               H[n] end,
+        :∂u_∂tr     => quote a_n_exp_iθn * k*         (H[n-1] - H[n+1])/2 end,
+        :∂2u_∂tr2   => quote a_n_exp_iθn * k*k*     (H[n-2] - 2*H[n] + H[n+2])/4 end,
+        :∂3u_∂tr3   => quote a_n_exp_iθn * k*k*k* (H[n-3] - 3*H[n-1] + 3*H[n+1] - H[n+3])/8 end,
+        :∂u_∂tθ     => quote im*n*a_n_exp_iθn *     H[n] end,
+        :∂2u_∂tr∂tθ => quote im*n*a_n_exp_iθn * k* (H[n-1] - H[n+1])/2 end,
+    )
+    return quote
+        r = p.r
+        θ = p.θ
+        k = h.k
+        a = h.a
+        if isnan(k*r)
+            cnan = (1 + im)*typeof(k*r)(NaN)
+            return (;$([:($s = cnan) for s in tuple_symbols]...))
+        end
 
-    H = padded_hankelh1_vec(eachindex(a), k*r, $order)
-    return (;$(join(["$s = $s(h,θ,H)" for s in tuple_symbols],',')))
-    """)
-    parsed_src.head = :block
-    return parsed_src
+        H = padded_hankelh1_vec(eachindex(a), k*r, $order)
+        $([:($s = zero(complex(k*r))) for s in tuple_symbols]...)
+        u = zero(complex(k*r))
+        @fastmath @inbounds for n in eachindex(h.a)
+            # u += $(deriv_expr[:u])
+            a_n_exp_iθn = a[n] * exp(im*θ*n)
+            $([:($s += $(deriv_expr[s])) for s in tuple_symbols]...)
+        end
+        return (;$([s for s in tuple_symbols]...))
+    end
 end
 
 padding_needed(::Type{NamedTuple{(:u,)}}) = Val{0}()
