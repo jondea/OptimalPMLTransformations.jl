@@ -102,6 +102,22 @@ function linear_interpolation(p0::InterpPoint, p1::InterpPoint, ν::Number)
     )
 end
 
+function robust_linear_interpolation(x0, x1, f0, f1, x)
+    if     isnan(f0) return f1
+    elseif isnan(f1) return f0
+    else             return linear_interpolation(x0, x1, f0, f1, x)
+    end
+end
+
+function robust_linear_interpolation(p0::InterpPoint, p1::InterpPoint, ν::Number)
+    return InterpPoint(
+        ν,
+        robust_linear_interpolation(p0.ν, p1.ν, p0.tν,     p1.tν,     ν),
+        robust_linear_interpolation(p0.ν, p1.ν, p0.∂tν_∂ν, p1.∂tν_∂ν, ν),
+        robust_linear_interpolation(p0.ν, p1.ν, p0.∂tν_∂ζ, p1.∂tν_∂ζ, ν)
+    )
+end
+
 # First order Taylor series
 linear_extrapolation(x0, f0, df_dx0, x) = f0 + df_dx0*(x-x0)
 
