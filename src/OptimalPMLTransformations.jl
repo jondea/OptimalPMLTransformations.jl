@@ -114,6 +114,8 @@ export line_integrate_hcubature
 
 export optimal_pml_transformation_solve
 
+export online_sum_kbn
+
 include("utils.jl")
 
 include("coordinates/coordinates.jl")
