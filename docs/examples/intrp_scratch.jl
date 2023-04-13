@@ -86,8 +86,8 @@ end
 
 # integral_r = integrate(region1, integrand; order=int_order)
 
-# import OptimalPMLTransformations.evalute_and_correct
-# integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
+# import OptimalPMLTransformations.evaluate_and_correct
+# integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evaluate_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
 
 # integral_h = integrate_hcubature(intrp.continuous_region[1], integrand_patch_fnc)
 

@@ -19,7 +19,7 @@ begin
 
     u_fnc_νζ(tν, ζ) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν,ζ), pml)
 
-    intrp = interpolate(u, pml, range(θ₋, θ₊, length=11), 0.999; ε=1e-8)
+    intrp = interpolation(u, pml, range(θ₋, θ₊, length=11), 0.999; ε=1e-8)
 
     integrand(ν::Number, ∂tν_∂ν::Number) = 1.0/∂tν_∂ν + ((1-ν)^2)*∂tν_∂ν
     integrand(p::InterpPoint) = integrand(p.ν, p.∂tν_∂ν)
@@ -39,7 +39,7 @@ begin
     @show integral_i
 
 
-    integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
+    integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evaluate_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
     integral_h = integrate_hcubature(intrp, integrand_patch_fnc; atol=1e-14, rtol=1e-12, maxevals=1000_000)
 
     @show integral_h
