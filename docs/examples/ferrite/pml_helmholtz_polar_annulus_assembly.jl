@@ -138,6 +138,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # nodes are shared between elements, so no rips should get through the floating point cracks
                 θ_min, θ_max = extrema(c->c[2], coords)
 
+
+                u_pml = PMLFieldFunction(pml)
+
                 # Used inside integrate_hcubature
                 function contribution(tpoint::TransformationPoint)
                     ν = tpoint.ν
@@ -192,8 +195,15 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # implement a new element, which might throw off the
                 # isoparametric stuff)
 
+                # Initial estimate without correction to get a rough idea of magnitude
+                Ke_est = integrate(intrp, contribution)
+                rtol=1e-8
+                atol=rtol*norm(Ke_est)
+
                 # Ke += integrate_hcubature(intrp, contribution; atol=1e-12, rtol=1e-10, maxevals=1_000)
-                Ke += integrate_hcubature(intrp, contribution; atol=1e-8, rtol=1e-6, maxevals=1_000)
+                Ke += integrate_hcubature(intrp, contribution; atol=rtol*norm(Ke_est), rtol, maxevals=1_000, corrector=u_pml)
+
+                atol=rtol*norm(Ke)
 
                 # Used inside integrate_hcubature
                 function line_integrand(tpoint)
@@ -241,9 +251,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 for (region1, region2) in consecutive_pairs(intrp.continuous_region)
                     tν₋ = last(region1.lines)
                     tν₊ = first(region2.lines)
-                    jump_integrand(segment0, segment1, ν) = line_integrand(segment0,ν) - line_integrand(segment1,ν)
-                    # Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-12, rtol=1e-10, maxevals=10_000)
-                    Ke -= line_integrate_hcubature(tν₋, tν₊, jump_integrand; atol=1e-6, rtol=1e-8, maxevals=1_000)
+                    Ke -= line_integrate_hcubature(tν₋, line_integrand; atol, rtol, maxevals=1_000, corrector=u_pml)
+                    Ke += line_integrate_hcubature(tν₊, line_integrand; atol, rtol, maxevals=1_000, corrector=u_pml)
                 end
             end
         end
