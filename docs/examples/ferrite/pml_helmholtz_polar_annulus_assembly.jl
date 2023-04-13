@@ -139,7 +139,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 θ_min, θ_max = extrema(c->c[2], coords)
 
                 # Used inside integrate_hcubature
-                function contribution(patch, ν, ζ)
+                function contribution(tpoint::TransformationPoint)
+                    ν = tpoint.ν
+                    ζ = tpoint.ζ
                     (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
 
                     # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
@@ -152,7 +154,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
                     Ke = zeros(T, n_basefuncs, n_basefuncs)
 
-                    tr, J_ = tr_and_jacobian(pml, patch, PolarCoordinates(r, θ))
+                    tr, J_ = tr_and_jacobian(pml, tpoint)
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
                     Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])
                     Jₜᵣᵣ = inv(J_pml)
@@ -194,8 +196,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 Ke += integrate_hcubature(intrp, contribution; atol=1e-8, rtol=1e-6, maxevals=1_000)
 
                 # Used inside integrate_hcubature
-                function line_integrand(segment, ν)
-                    ζ = segment.ζ
+                function line_integrand(tpoint)
+                    ν = tpoint.ν
+                    ζ = tpoint.ζ
                     (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
 
                     # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
@@ -208,7 +211,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
                     Ke = zeros(T, n_basefuncs, n_basefuncs)
 
-                    tr, J_ = tr_and_jacobian(pml, segment, PolarCoordinates(r, θ))
+                    tr, J_ = tr_and_jacobian(pml, tpoint)
                     dtr_dν = J_[1,1]
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
                     Jᵣₓ = diagm(Tensor{2,2}, [1.0, 1/tr])

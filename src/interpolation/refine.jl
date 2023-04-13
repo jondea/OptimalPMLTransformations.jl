@@ -39,7 +39,7 @@ function refine!(line::InterpLine, u::AbstractFieldFunction, pml::PMLGeometry; �
         # Guard against steps which are too small
         if abs(prev_point.ν - next_point.ν) < δ
             ν = (prev_point.ν + next_point.ν)/2
-            tν0 = eval_hermite_patch(prev_point, next_point, ν).tν
+            tν0 = robust_hermite_interpolation(prev_point, next_point, ν).tν
 
             tν, field, converged = corrector(field_fnc, U, ν, tν0; N_iter_max=10, householder_order=3)
             if !converged error() end

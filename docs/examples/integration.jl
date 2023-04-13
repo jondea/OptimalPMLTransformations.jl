@@ -98,10 +98,10 @@ TODO
 """
 
 # ╔═╡ 037c12df-5bb3-40c2-892e-09afcdb27569
-import OptimalPMLTransformations.evalute_and_correct
+import OptimalPMLTransformations.evaluate_and_correct
 
 # ╔═╡ 66f5b6d2-cf1a-4e3d-91a9-806d06d0a393
-integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
+integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evaluate_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
 
 # ╔═╡ 93a9e662-2e2b-4a2f-8f00-b864b807b46f
 integrate_hcubature(intrp.continuous_region[1], integrand_patch_fnc; atol=1e-14, rtol=1e-12, maxevals=1000_000)
@@ -225,7 +225,7 @@ let
 	(ζ0, ζ1, ν0, ν1, I, E) = (-0.1303436279296875, -0.13034210205078128, 0.3508955859812662, 0.35089699857745116, NaN + NaN*im, NaN)
 
 	# f(ν,ζ) = imag(OptimalPMLTransformations.evaluate(patch,ζ0,ζ1,ν,ζ).tν)
-	f(ν,ζ) = imag(OptimalPMLTransformations.evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ).tν)
+	f(ν,ζ) = imag(OptimalPMLTransformations.evaluate_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ).tν)
 
 	surface(range(ν0,ν1,length=100), range(ζ0,ζ1,length=100), f)
 	(ζ0 - ζ1,  ν0 - ν1)

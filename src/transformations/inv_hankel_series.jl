@@ -26,20 +26,8 @@ end
 
 has_interpolation(p::InvHankelSeriesPML) = !isempty(p.interp)
 
-function tr_and_jacobian(pml::InvHankelSeriesPML, patch::Union{InterpPatch,InterpSegment}, coords::PolarCoordinates)
-    return tr_and_jacobian(pml, patch, convert(PMLCoordinates, coords, pml.geom))
-end
-
-function tr_and_jacobian(pml::InvHankelSeriesPML, patch::Union{InterpPatch,InterpSegment}, coords::PMLCoordinates)
-    p = evalute_and_correct(pml.u, pml.geom, patch, coords.ν, coords.ζ[1])
+function tr_and_jacobian(pml::InvHankelSeriesPML, p::TransformationPoint)
     jacobian = SA[p.∂tν_∂ν 0; p.∂tν_∂ζ 1]
-    tr = convert(PolarCoordinates, PMLCoordinates(p.tν, coords.ζ), pml.geom).r
-    return tr, jacobian
-end
-
-function tr_and_jacobian(pml::InvHankelSeriesPML, p::InterpPoint, ζ)
-    p = correct(pml.u, pml.geom, p, ζ)
-    jacobian = SA[p.∂tν_∂ν 0; p.∂tν_∂ζ 1]
-    tr = convert(PolarCoordinates, PMLCoordinates(p.tν, ζ), pml.geom).r
+    tr = convert(PolarCoordinates, PMLCoordinates(p.tν, p.ζ), pml.geom).r
     return tr, jacobian
 end

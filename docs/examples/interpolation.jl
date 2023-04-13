@@ -213,10 +213,10 @@ function Base.iterate(it::InterpPatchIterator, state)
 	# popping it to show it has been used. Interpolate by peeking forward for the other
 	if peek(state.intrp_points0).ν > peek(state.intrp_points1).ν
 		intrp11 = popfirst!(state.intrp_points1)
-		intrp10 = eval_hermite_patch(state.intrp00, peek(state.intrp_points0), intrp11.ν)
+		intrp10 = robust_hermite_interpolation(state.intrp00, peek(state.intrp_points0), intrp11.ν)
 	elseif peek(state.intrp_points1).ν > peek(state.intrp_points0).ν
 		intrp10 = popfirst!(state.intrp_points0)
-		intrp11 = eval_hermite_patch(state.intrp01, peek(state.intrp_points1), intrp10.ν)
+		intrp11 = robust_hermite_interpolation(state.intrp01, peek(state.intrp_points1), intrp10.ν)
 	else # Equal, use both
 		intrp10 = popfirst!(state.intrp_points0)
 		intrp11 = popfirst!(state.intrp_points1)
@@ -403,7 +403,7 @@ begin
 		patch::InterpPatch
 		u_pml::PMLFF
 	end
-	(ep::ExactPatch)(ν::Number, ζ::Number) = evalute_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ν, ζ)
+	(ep::ExactPatch)(ν::Number, ζ::Number) = evaluate_and_correct(ep.u_pml.u, ep.u_pml.pml, ep.patch, ν, ζ)
 	(ep::ExactPatch)(νζ::AbstractVector) = ep(νζ[1], νζ[2])
 end
 
@@ -424,7 +424,7 @@ function interpolation_line(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0)
 end
 
 # ╔═╡ 7d7f969f-f2fa-4bd4-91ce-50d404f8ff2b
-integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evalute_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
+integrand_patch_fnc(patch, ζ0, ζ1, ν, ζ) = integrand(evaluate_and_correct(u, pml, patch, ζ0, ζ1, ν, ζ))
 
 # ╔═╡ 02105c89-d058-4cea-ae12-0481eacb6fdc
 consecutive_pairs(r) = partition(r, 2, 1)

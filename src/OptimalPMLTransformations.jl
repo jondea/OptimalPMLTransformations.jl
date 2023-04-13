@@ -77,6 +77,7 @@ export interpolation,
        Interpolation,
        InterpPatch,
        eachpatch,
+       TransformationPoint,
        Dtν_ν,
        Dtν_νζ,
        ∂tν_∂ν,
@@ -84,10 +85,10 @@ export interpolation,
        refine_in_ζ!,
        refine,
        evaluate,
-       evalute_and_correct
+       correct
 export continue_in_ζ
 export Rip
-export eval_hermite_patch
+export hermite_interpolation
 
 export Rip2D
 export find_rips

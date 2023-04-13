@@ -75,7 +75,7 @@ function interpolation(u_pml::PMLFieldFunction, ζ::Number; ν_max=1.0, kwargs..
 	return InterpLine(ζ, νs, tνs, ∂tν_∂νs, ∂tν_∂ζs)
 end
 
-function eval_hermite_patch(ν0::Number, ν1::Number, p0::Dtν_ν, p1::Dtν_ν, ν::Number)
+function hermite_interpolation(ν0::Number, ν1::Number, p0::Dtν_ν, p1::Dtν_ν, ν::Number)
 
     tν0=p0.tν; ∂tν_∂ν0=p0.∂tν_∂ν;
     tν1=p1.tν; ∂tν_∂ν1=p1.∂tν_∂ν;
@@ -122,7 +122,7 @@ end
 linear_extrapolation(x0, f0, df_dx0, x) = f0 + df_dx0*(x-x0)
 
 # This handles nans, but the other evaluates don't, probably should be consistent here
-function eval_hermite_patch(p0::InterpPoint, p1::InterpPoint, ν::Number)
+function robust_hermite_interpolation(p0::InterpPoint, p1::InterpPoint, ν::Number)
 
     ν0=p0.ν; tν0=p0.tν; ∂tν_∂ν0=p0.∂tν_∂ν; ∂tν_∂ζ0=p0.∂tν_∂ζ
     ν1=p1.ν; tν1=p1.tν; ∂tν_∂ν1=p1.∂tν_∂ν; ∂tν_∂ζ1=p1.∂tν_∂ζ
@@ -160,7 +160,7 @@ function InterpPoint(line::InterpLine, ν::Float64)::InterpPoint
     end
     p0 = line.points[i-1]
 
-    return eval_hermite_patch(p0, p1, ν)
+    return robust_hermite_interpolation(p0, p1, ν)
 end
 
 function (line::InterpLine)(ν::Float64)
@@ -171,14 +171,11 @@ function ∂tν_∂ν(line::InterpLine, ν::Float64)
     return InterpPoint(line, ν).∂tν_∂ν
 end
 
-
-function eval_hermite_patch(ζ0::Number, ζ1::Number, p00::InterpPoint, p10::InterpPoint, p01::InterpPoint, p11::InterpPoint, ν::Number, ζ::Number)
-    @assert p00.ν == p01.ν
-    @assert p10.ν == p11.ν
-    InterpPoint(ν, eval_hermite_patch(p00.ν, p10.ν, ζ0, ζ1, Dtν_νζ(p00), Dtν_νζ(p10), Dtν_νζ(p01), Dtν_νζ(p11), ν, ζ))
+function hermite_interpolation(patch::InterpPatch, ν::Number, ζ::Number)
+    return hermite_interpolation(patch.ν0, patch.ν1, patch.ζ0, patch.ζ1, patch.p00, patch.p10, patch.p01, patch.p11, ν, ζ)
 end
 
-function eval_hermite_patch(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, p00::Dtν_νζ, p10::Dtν_νζ, p01::Dtν_νζ, p11::Dtν_νζ, ν::Number, ζ::Number)
+function hermite_interpolation(ν0::Number, ν1::Number, ζ0::Number, ζ1::Number, p00::Dtν_νζ, p10::Dtν_νζ, p01::Dtν_νζ, p11::Dtν_νζ, ν::Number, ζ::Number)
 
     tν00=p00.tν; ∂tν_∂ν00=p00.∂tν_∂ν; ∂tν_∂ζ00=p00.∂tν_∂ζ
     tν10=p10.tν; ∂tν_∂ν10=p10.∂tν_∂ν; ∂tν_∂ζ10=p10.∂tν_∂ζ
@@ -260,7 +257,7 @@ function cubic_linear_extrapolation(ν0::Number, ζ0::Number, ζ1::Number, p00::
 
 end
 
-function evaluate(patch::InterpPatch, ν, ζ)::InterpPoint
+function evaluate(patch::InterpPatch, ν, ζ)::TransformationPoint
     intrp00 = patch.p00
     intrp01 = patch.p01
     intrp10 = patch.p10
@@ -269,44 +266,55 @@ function evaluate(patch::InterpPatch, ν, ζ)::InterpPoint
     ζ0 = patch.ζ0
     ζ1 = patch.ζ1
 
-    ν0 = intrp00.ν
-    ν1 = intrp10.ν
+    ν0 = patch.ν0
+    ν1 = patch.ν1
 
     if !isfinite(intrp10.tν) || !isfinite(intrp11.tν)
         # The transformation is unbounded at the outer edge so we have to extrapolate from the second to last point
-        return InterpPoint(ν, cubic_linear_extrapolation(ν0, ζ0, ζ1, Dtν_νζ(intrp00), Dtν_νζ(intrp01), ν, ζ))
+        return TransformationPoint(ν, ζ, cubic_linear_extrapolation(ν0, ζ0, ζ1, intrp00, intrp01, ν, ζ))
     elseif isnan(intrp00.∂tν_∂ν) || isnan(intrp00.∂tν_∂ζ) ||
            isnan(intrp01.∂tν_∂ν) || isnan(intrp01.∂tν_∂ζ) ||
            isnan(intrp10.∂tν_∂ν) || isnan(intrp10.∂tν_∂ζ) ||
            isnan(intrp11.∂tν_∂ν) || isnan(intrp11.∂tν_∂ζ)
         # A derivative is undefined, happens around the root of a rip (a branch point)
-        return InterpPoint(ν, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
+        return TransformationPoint(ν, ζ, bilinear_patch(ν0, ν1,  ζ0, ζ1, intrp00.tν, intrp10.tν, intrp01.tν, intrp11.tν, ν, ζ)...)
     else
-        return eval_hermite_patch(ζ0, ζ1, intrp00, intrp10, intrp01, intrp11, ν, ζ)
+        return TransformationPoint(ν, ζ, hermite_interpolation(patch, ν, ζ))
     end
 end
 
 (patch::InterpPatch)(ν::Number, ζ::Number) = evaluate(patch, ν, ζ)
+(patch::InterpPatch)(ν::Number, ζ::Number, ::Nothing) = evaluate(patch, ν, ζ)
+(patch::InterpPatch)(ν::Number, ζ::Number, corrector) = evaluate_and_correct(patch, ν, ζ, corrector)
 
-function evalute_and_correct(u, pml, patch::InterpPatch, ν, ζ)
-    intrp = evaluate(patch, ν, ζ)
-    if !isfinite(intrp)
-        @warn "Patch evaluated to non-finite value, there's no hope for the corrector"
-        return intrp
-    end
-    field_fnc(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν, ζ), pml)
+function correct(intrp::TransformationPoint, u_pml::PMLFieldFunction)
+    ν = intrp.ν; ζ = intrp.ζ
+    field_fnc(tν) = u_pml(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, tν, ζ)
     U_field = field_fnc(zero(complex(ν)))
     tν, field, converged = corrector(field_fnc, U_field.u, ν, intrp.tν)
-    if converged
-        return InterpPoint(ν, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field, ν))
+    return TransformationPoint(ν, ζ, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field, ν)), converged
+end
+
+function evaluate_and_correct(patch::InterpPatch, ν, ζ, u_pml::PMLFieldFunction)
+    intrp = evaluate(patch, ν, ζ)
+    if !isfinite(patch)
+        return intrp
+    end
+    if !isfinite(intrp)
+        @warn "Patch at $ν and $ζ evaluated to non-finite value, there's no hope for the corrector"
+        return intrp
+    end
+    corrected_intrp, converged = correct(intrp, u_pml)
+    if converged && isfinite(corrected_intrp)
+        return corrected_intrp
     else
-        @warn "Corrector did not converge for patch, using interpolated"
+        @warn "Corrector at $ν and $ζ did not converge for patch, using interpolated"
         return intrp
     end
 end
 
 
-function evaluate(segment::InterpSegment, ν)::InterpPoint
+function evaluate(segment::InterpSegment, ν)::TransformationPoint
 
     p0 = segment.p0
     p1 = segment.p1
@@ -314,38 +322,43 @@ function evaluate(segment::InterpSegment, ν)::InterpPoint
     ν0 = p0.ν
     ν1 = p1.ν
 
-    # 2 special cases we want to handle differently
+    ζ = segment.ζ
+
+    # special cases we want to handle differently
     if !isfinite(p1.tν)
         # p1 is not finite, extrapolate from p0 (this happens on the outer edge)
         tν = linear_extrapolation(ν0, p0.tν, p0.∂tν_∂ν, ν)
-        return InterpPoint(ν, tν, p0.∂tν_∂ν, p0.∂tν_∂ζ)
+        return TransformationPoint(ν, ζ, tν, p0.∂tν_∂ν, p0.∂tν_∂ζ)
     elseif !isfinite(p0.∂tν_∂ν) || !isfinite(p0.∂tν_∂ζ) ||
            !isfinite(p1.∂tν_∂ν) || !isfinite(p1.∂tν_∂ζ)
         # Some derivatives are bad, fall back to linear interpolation
-        return linear_interpolation(p0, p1, ν)
+        return TransformationPoint(robust_linear_interpolation(p0, p1, ν), ζ)
     else
         # Everything else, note that there may still be NaNs/Infs, and they just propagate
-        tν_and_∂tν_∂ν = eval_hermite_patch(ν0, ν1, Dtν_ν(p0), Dtν_ν(p1), ν)
-        ∂tν_∂ζ = linear_interpolation(ν0, ν1, p0.∂tν_∂ζ, p1.∂tν_∂ζ, ν)
-        return InterpPoint(ν, tν_and_∂tν_∂ν, ∂tν_∂ζ)
+        (;tν, ∂tν_∂ν) = hermite_interpolation(ν0, ν1, Dtν_ν(p0), Dtν_ν(p1), ν)
+        ∂tν_∂ζ = robust_linear_interpolation(ν0, ν1, p0.∂tν_∂ζ, p1.∂tν_∂ζ, ν)
+        return TransformationPoint(ν, ζ, tν, ∂tν_∂ν, ∂tν_∂ζ)
     end
 end
 
 (segment::InterpSegment)(ν::Number) = evaluate(segment, ν)
+(segment::InterpSegment)(ν::Number, ::Nothing) = evaluate(segment, ν)
+(segment::InterpSegment)(ν::Number, corrector) = evaluate_and_correct(segment, ν, corrector)
 
-function evalute_and_correct(u, pml, segment::InterpSegment, ν, ζ)
+function evaluate_and_correct(segment::InterpSegment, ν, u_pml::PMLFieldFunction)
     intrp = evaluate(segment, ν)
-    if !isfinite(intrp)
-        @warn "segment evaluated to non-finite value, there's no hope for the corrector"
+    if !isfinite(segment)
         return intrp
     end
-    field_fnc(tν) = u(NamedTuple{(:u, :∂u_∂tν, :∂u_∂tζ, :∂2u_∂tν2, :∂2u_∂tν∂tζ, :∂3u_∂tν3)}, PMLCoordinates(tν, ζ), pml)
-    U_field = field_fnc(zero(complex(ν)))
-    tν, field, converged = corrector(field_fnc, U_field.u, ν, intrp.tν)
-    if converged
-        return InterpPoint(ν, tν, ∂tν_∂ν(field, U_field), ∂tν_∂ζ(field, U_field, ν))
+    if !isfinite(intrp)
+        @warn "Segment at $ν and $ζ evaluated to non-finite value, there's no hope for the corrector"
+        return intrp
+    end
+    corrected_intrp, converged = correct(intrp, u_pml)
+    if converged && isfinite(corrected_intrp)
+        return corrected_intrp
     else
-        @warn "Corrector did not converge for segment, using interpolated"
+        @warn "Corrector at $ν and $ζ did not converge for segment, using interpolated"
         return intrp
     end
 end
