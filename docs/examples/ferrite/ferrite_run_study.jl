@@ -93,6 +93,14 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
 		result = solve(params)
         write_csv_line(result_folder, params, result, u_name, "InvHankel$n_h", "GL$(N_pml*nqr_1d)x$(nqr_1d)")
 	end
+
+    # N_pml has no effect (we set it to 0) so no point repeating for each N_pml
+    if N_pml == 1
+        pml = InvHankelSeriesPML(AnnularPML(R, δ_pml), HankelSeries(u_ana))
+        params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml=0, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr)
+        result = solve(params)
+        write_csv_line(result_folder, params, result, u_name, "Optimal$n_h", "Optimal")
+    end
 end
 
 function run_all(;full_run=false)
