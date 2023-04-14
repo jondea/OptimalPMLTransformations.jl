@@ -138,6 +138,9 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # nodes are shared between elements, so no rips should get through the floating point cracks
                 θ_min, θ_max = extrema(c->c[2], coords)
 
+                # ds1_dν = 2
+                # ds2_dθ = 2/(θ_max - θ_min)
+                # J_νs = diagm(Tensor{2,2}, [ds1_dν, ds2_dθ])
 
                 u_pml = PMLFieldFunction(pml)
 
@@ -148,6 +151,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                     (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
 
                     # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
+                    # How do we know which way it is oriented?
                     s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
 
                     # Create quad rule with a single point
