@@ -107,7 +107,10 @@ function run_all(;full_run=false)
 	end
 	n_hs = [0, 3]
 	ks = [0.1, 1.0, 10.0]
-	@showprogress [solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder) for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls]
+
+    for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls
+        solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder)
+    end
 
     # Collate individual results into one csv
 	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
