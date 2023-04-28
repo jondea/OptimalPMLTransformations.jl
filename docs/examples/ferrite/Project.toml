@@ -1,9 +1,11 @@
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Ferrite = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 FerriteViz = "59d0093e-b1f1-4fb7-ac85-ab57e45f39d9"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 InverseHankelFunction = "bec4b5d4-d8c4-11e9-2b25-9be465e100f1"
 IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"

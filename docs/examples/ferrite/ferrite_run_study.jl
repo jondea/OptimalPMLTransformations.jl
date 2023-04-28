@@ -23,6 +23,7 @@ begin
     using DataFrames
     using Dates
     import Test: @test
+    using Glob
 end
 
 @revise using Ferrite
@@ -51,15 +52,13 @@ function solve_with_catch()
     return result
 end
 
-function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, n_h, order=2, folder)
+function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml=1.0, u_ana, u_name, order=2, folder, do_optimal)
 
 	nqr_1d = 2*(order + 1)
 	bulk_qr=QuadratureRule{2, RefCube}(nqr_1d)
 	pml_qr=QuadratureRule{2, RefCube}(nqr_1d)
-	u_ana=single_hankel_mode(k, n_h, 1/hankelh1(n_h, k*cylinder_radius))
-    u_name=string(n_h)
 
-    result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
+    result_folder="$folder/k_$k/n_pml_$N_pml/u_$u_name"
 	run(`mkdir -p $result_folder`)
 
 	# SFB
@@ -70,41 +69,44 @@ function solve_and_save(;k, N_θ, N_r, N_pml, cylinder_radius=1.0, R=2.0, δ_pml
         write_csv_line(result_folder, params, result, u_name, "SFB", "GL$(nqr_1d)x$(nqr_1d)")
 	end
 
-	# InvHankel n_h
-	let
-		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-        params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr)
-		result = solve(params)
-        write_csv_line(result_folder, params, result, u_name, "InvHankel$n_h", "GL$(nqr_1d)x$(nqr_1d)")
-	end
-
-	# InvHankel 0
-    if n_h != 0
+    # InvHankel 0 as a not-necessarily-optimal PML
+    let
         pml = InvHankelPML(;R, δ=δ_pml, k, m=0)
         params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr)
-		result = solve(params)
+        result = solve(params)
         write_csv_line(result_folder, params, result, u_name, "InvHankel0", "GL$(nqr_1d)x$(nqr_1d)")
-	end
+    end
 
-	# InvHankel n_h with N_pml=1 and increasing integration order
-	let
-		pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
-		aniso_qr=anisotropic_quadrature(RefCube, N_pml*nqr_1d, nqr_1d)
-        params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml=1, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr=aniso_qr)
-		result = solve(params)
-        write_csv_line(result_folder, params, result, u_name, "InvHankel$n_h", "GL$(N_pml*nqr_1d)x$(nqr_1d)")
-	end
+    # If u_ana is a single hankel mode, then the InvHankelPML is optimal. Test that this is true
+    if typeof(u_ana) <: SingleAngularFourierMode
+        n_h = u_ana.m
+        # InvHankel n_h with increasing N_pml. This is the standard PML approach. If n_h == 0, then we have already done this
+        if n_h != 0
+            pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+            params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr)
+            result = solve(params)
+            write_csv_line(result_folder, params, result, u_name, "InvHankel$n_h", "GL$(nqr_1d)x$(nqr_1d)")
+        end
 
-    # N_pml has no effect (we set it to 0) so no point repeating for each N_pml
-    if N_pml == 1
+        # InvHankel n_h with N_pml=1 and increasing integration order. This is a bit like the optimal PML approach
+        let
+            pml = InvHankelPML(;R, δ=δ_pml, k, m=n_h)
+            aniso_qr=anisotropic_quadrature(RefCube, N_pml*nqr_1d, nqr_1d)
+            params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml=1, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr=aniso_qr)
+            result = solve(params)
+            write_csv_line(result_folder, params, result, u_name, "InvHankel$n_h", "GL$(N_pml*nqr_1d)x$(nqr_1d)")
+        end
+    end
+
+    if do_optimal
         pml = InvHankelSeriesPML(AnnularPML(R, δ_pml), HankelSeries(u_ana))
         params = PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml=0, cylinder_radius, R, δ_pml, u_ana, order, pml, bulk_qr, pml_qr)
         result = solve(params)
-        write_csv_line(result_folder, params, result, u_name, "Optimal$n_h", "Optimal")
+        write_csv_line(result_folder, params, result, u_name, "Optimal", "Optimal")
     end
 end
 
-function run_all(;full_run=false)
+function run_all(;full_run=false, cylinder_radius=1.0, R=2.0)
 	folder="study_" * Dates.format(now(), dateformat"YYYY-mm-dd_HH-MM-SS")
 
 	if full_run
@@ -114,19 +116,27 @@ function run_all(;full_run=false)
 		resolutions = [8]
 		N_pmls = [1, 4]
 	end
-	n_hs = [0, 3]
 	ks = [0.1, 1.0, 10.0]
 
-    for res in resolutions, n_h in n_hs, k in ks, N_pml in N_pmls
-        solve_and_save(;k, N_θ=max(n_h, 1)*res, N_r=round(Int, max(res, k*res)), n_h, N_pml, folder)
+    @showprogress for res in resolutions, k in ks, N_pml in N_pmls
+        u_anas = [
+            "0" => single_hankel_mode(k, 0, 1/hankelh1(0, k*cylinder_radius)),
+            "3" => single_hankel_mode(k, 3, 1/hankelh1(3, k*cylinder_radius)),
+            "scattered" => HankelSeries(k, scattered_coef(-10:10, k)),
+        ]
+        N_θ = round(Int, τ * max(res, k*res))
+        N_r = round(Int, (R - cylinder_radius) * max(res, k*res))
+        for (u_name, u_ana) in u_anas
+            do_optimal = N_pml == maximum(N_pmls)
+            solve_and_save(;k, N_θ, N_r, u_name, u_ana, N_pml, folder, do_optimal, cylinder_radius, R)
+        end
     end
 
     # Collate individual results into one csv
 	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
-	for n_h in n_hs, k in ks, N_pml in N_pmls
-		result_folder="$folder/k_$k/n_pml_$N_pml/n_h_$n_h"
+	for filename in glob(glob"*/*/*/result.csv", folder)
 		open("$folder/result.csv", "a") do outfile
-			write(outfile, read("$result_folder/result.csv"))
+			write(outfile, read(filename))
 		end
 	end
 
