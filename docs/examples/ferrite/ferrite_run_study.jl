@@ -133,7 +133,7 @@ function run_all(;full_run=false, cylinder_radius=1.0, R=2.0)
     end
 
     # Collate individual results into one csv
-	write("$folder/result.csv", "k,n_h,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
+	write("$folder/result.csv", "k,u_name,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error\n")
 	for filename in glob(glob"*/*/*/result.csv", folder)
 		open("$folder/result.csv", "a") do outfile
 			write(outfile, read(filename))
@@ -148,7 +148,7 @@ results_df = run_all(;full_run=("--full_run" in ARGS))
 if "--test_run" in ARGS
     validata = CSV.read("validata/result.csv", DataFrame)
 
-    df = leftjoin(validata, results_df; on=[:k, :n_h, :N_θ, :N_r, :N_pml, :pml, :integration], renamecols="_exact"=>"_test")
+    df = leftjoin(validata, results_df; on=[:k, :u_name, :N_θ, :N_r, :N_pml, :pml, :integration], renamecols="_exact"=>"_test")
     df.assemble_time_ratio = df.assemble_time_test ./ df.assemble_time_exact
     df.solve_time_ratio = df.solve_time_test ./ df.solve_time_exact
     df.abs_sq_error_ratio = df.abs_sq_error_test ./ df.abs_sq_error_exact

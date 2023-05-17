@@ -1,4 +1,4 @@
-k,n_h,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error
+k,u_name,N_θ,N_r,N_pml,pml,integration,assemble_time,solve_time,abs_sq_error,abs_sq_norm,rel_error
 0.1,0,50,8,1,SFB,GL6x6,0.007672378,0.009349445,0.0013959286588376774,7.371930068080431,0.013760715259343661
 0.1,0,50,8,1,InvHankel0,GL6x6,0.008196294,0.009428701,5.29517692484871e-8,7.275902314672021,8.53093843764509e-5
 0.1,0,50,8,1,InvHankel0,GL6x6,0.049037483,0.011056486,5.29517692484871e-8,7.275902314672021,8.53093843764509e-5
