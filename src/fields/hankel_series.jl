@@ -167,3 +167,4 @@ two_mode_pole_coef(ind::AbstractArray, z_pole, θ_pole=0.0) = map(n->two_mode_po
 two_mode_pole_series(k, r_pole) = HankelSeries(k, OffsetVector(two_mode_pole_coef(0:1, k*r_pole),0:1))
 
 HankelSeries(u::SingleAngularFourierMode) = HankelSeries(u.k, OffsetVector([u.a], u.m:u.m))
+HankelSeries(u::HankelSeries) = u
