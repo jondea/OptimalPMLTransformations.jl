@@ -163,8 +163,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
                     tr, J_ = tr_and_jacobian(pml, tpoint)
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
-                    Jₜᵣₜₓ = Tensor{2,2}([cos(θ) sin(θ); -tr*sin(θ) tr*cos(θ)])
-                    Jₜₓₜᵣ = inv(Jₜᵣₜₓ)
+                    Jₜₓₜᵣ = diagm(Tensor{2,2}, [1.0, 1/tr])
                     Jₜᵣᵣ = inv(J_pml)
                     detJₜᵣᵣ	= det(J_pml)
                     for i in 1:n_basefuncs
@@ -182,7 +181,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                             ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
 
                             # Note there is no dΩ scaling because this is handled in the integrate function which calls this
-                            Ke[i, j] += (( Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅  ∇δu) ⋅ (Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅ ∇u) - k^2*δu * u) * tr * detJₜᵣᵣ
+                            Ke[i, j] += ((Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅  ∇δu) ⋅ (Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅ ∇u) - k^2*δu * u) * tr * detJₜᵣᵣ
                         end
                     end
                     return Ke
@@ -229,10 +228,7 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                     tr, J_ = tr_and_jacobian(pml, tpoint)
                     dtr_dν = J_[1,1]
                     J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
-                    Jₜᵣₜₓ = Tensor{2,2}([cos(θ) sin(θ); -tr*sin(θ) tr*cos(θ)])
-                    Jₜₓₜᵣ = inv(Jₜᵣₜₓ)
                     Jₜᵣᵣ = inv(J_pml)
-                    dtx_dtr = Tensors.Vec(-sin(θ), cos(θ))
                     for i in 1:n_basefuncs
                         # Shape function is defined on face, we use ν to extend into the collapsed PML
                         δU = shape_value(pml_cellvalues, 1, i)
@@ -246,7 +242,8 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                             ∇U = shape_gradient(pml_cellvalues, 1, j)
                             u = U*(1-ν)
                             ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
-                            Ke[i, j] += (δu * ((Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅ ∇u) ⋅dtx_dtr)) *dtr_dν
+                            # Second index is ∂/∂θ, which is the normal derivative
+                            Ke[i, j] += (δu * ((Jₜᵣᵣ ⋅ ∇u)[2])) * dtr_dν / tr
                         end
                     end
                     return Ke
