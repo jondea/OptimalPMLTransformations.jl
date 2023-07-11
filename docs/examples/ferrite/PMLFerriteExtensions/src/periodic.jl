@@ -43,7 +43,7 @@ function nodedof(dh::DofHandler, cell_idx::Int, node_idx)
     return dh.cell_dofs[dh.cell_dofs_offset[cell_idx] + node_idx - 1]
 end
 
-function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing)
+function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, field_name=nothing; include_max=false, include_min=false)
 
     if isnothing(field_name) && length(ch.dh.field_names) == 1
         field_idx = 1
@@ -76,7 +76,10 @@ function add_periodic!(ch, free_to_constrained_facesets, global_to_face_coord, f
 
 		# Remove the corners because they seem to break the apply! function if applied to the same node as a Dirichlet condition. They shouldn't really though...
 		face_coord_extrema = extrema(m->m.face_coord, matches)
-		filter!(m->m.face_coord ∉ face_coord_extrema, matches)
+        corners_to_exclude = eltype(face_coord_extrema)[]
+        if !include_min push!(corners_to_exclude, face_coord_extrema[1]) end
+        if !include_max push!(corners_to_exclude, face_coord_extrema[2]) end
+		filter!(m->m.face_coord ∉ corners_to_exclude, matches)
 
         for match in matches
             if match.constrained_dof_index < 1 || match.free_dof_index < 1

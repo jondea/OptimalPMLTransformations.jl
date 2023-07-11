@@ -5,7 +5,10 @@ function setup_constraint_handler(dh::Ferrite.AbstractDofHandler, left_bc, right
 
 	gridfaceset(s) = getfaceset(dh.grid, s)
 
-    add_periodic!(ch, [gridfaceset("bottom")=>gridfaceset("top")], x->x[1])
+    # If the corresponding bc is not set, then it is unconstrained and therefore periodic
+    include_min=isnothing(left_bc)
+    include_max=isnothing(right_bc)
+    add_periodic!(ch, [gridfaceset("bottom")=>gridfaceset("top")], x->x[1]; include_min, include_max)
 
     if !isnothing(left_bc)
         inner_dbc = Dirichlet(:u, gridfaceset("left"), left_bc)
