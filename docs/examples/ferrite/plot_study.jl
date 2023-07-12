@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.26
+# v0.19.27
 
 #> [frontmatter]
 #> Author = "Jonathan Deakin"
@@ -57,11 +57,7 @@ md"# Relative error against $N_r$ for fixed number of PML elements $N_\text{pml}
 md"""
 ## Summary
 
-Zeroth Hankel mode works perfectly.
-
-Third Hankel mode does not, which I didn't realise until I did this.
-This is quite odd because it should be a simple case...
-However, this should be an easier one to investigate.
+Zeroth and third Hankel mode works perfectly.
 
 Scattered field works for $k=1$, which is great, because this is non-uniform in θ (although no rips).
 However, the ones with rips $k=0.1$ and $k=10$, are broken.
@@ -90,6 +86,28 @@ I will do a run with better bulk discretisation to see if the trend continues.
 We can also see that the effect is smaller for large $k$, this is because $H_0^{-1}$ → SFB as $k$ → ∞.
 """
 
+# ╔═╡ 72478013-8aa8-4cae-8da7-2067c3a2855f
+ md"""
+## Todo
+- Plot the transformed solution in the PML. Is it closer to a straight line than SFB?
+- Plot magnitude of Laplace
+- Increase Bulk discretisation as we increase the PML elements
+- Add some Bermudez transformations? With different δs?
+"""
+
+# ╔═╡ f2f2e6de-a3af-4c83-8db5-9c32ca1251e2
+md"$H₀(H^{-1}_0) + ε H₁(H^{-1}_0) ≈ ν + ε$"
+
+# ╔═╡ f543360f-f7ea-4222-9455-048a8bd94e65
+md"""
+
+Can we bound terms like $Hⱼ(H^{-1}_0(x))$ for all $j$?
+
+Then we'd have something like
+
+$a₀H₀(H^{-1}_0) + a₁H₁(H^{-1}_0(x)) + … = x + a₁H₁(H^{-1}_0(x)) + …$
+"""
+
 # ╔═╡ 18ce0325-21b3-42c6-988e-0964db4b34c0
 html"<div style='height: 30vh'></div>"
 
@@ -97,7 +115,7 @@ html"<div style='height: 30vh'></div>"
 md"# Appendix"
 
 # ╔═╡ 36a21f25-a23c-4de9-9334-c21c50bf0688
-df = CSV.read("study_2023-04-28_22-46-36/result.csv", DataFrame)
+df = CSV.read("study_2023-07-12_00-11-51/result.csv", DataFrame)
 
 # ╔═╡ 544b0416-e7e3-4938-b502-61e606fb6d56
 invh_df = let
@@ -1784,6 +1802,9 @@ version = "1.4.1+0"
 # ╟─629d693b-5920-43d5-87b1-5580e3c97bfb
 # ╟─c19d515b-0de6-40f2-9305-b6ab5ddce17f
 # ╟─a8dba96f-c9d5-4f74-8350-25a20e096380
+# ╟─72478013-8aa8-4cae-8da7-2067c3a2855f
+# ╟─f2f2e6de-a3af-4c83-8db5-9c32ca1251e2
+# ╟─f543360f-f7ea-4222-9455-048a8bd94e65
 # ╟─18ce0325-21b3-42c6-988e-0964db4b34c0
 # ╟─5bd16832-1380-40fe-879a-c0d8d0f29fcf
 # ╠═36a21f25-a23c-4de9-9334-c21c50bf0688
