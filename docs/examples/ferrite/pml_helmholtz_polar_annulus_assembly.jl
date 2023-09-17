@@ -114,6 +114,108 @@ end
 
 consecutive_pairs(r) = IterTools.partition(r, 2, 1)
 
+
+function pml_area_contribution_fnc(cell, cellvalues::CellScalarValues, pml::InvHankelSeriesPML, face)
+    return (tpoint::TransformationPoint) -> begin
+        ν = tpoint.ν
+        ζ = tpoint.ζ
+        (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
+
+        coords = getcoordinates(cell)
+        θ_min, θ_max = extrema(c->c[2], coords)
+
+        # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
+        # How do we know which way it is oriented?
+        s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
+        # Create quad rule with a single point
+        point_quad_rule = QuadratureRule{1,RefCube,Float64}([1.0],[Tensors.Vec(s_θ)])
+        pml_cellvalues = FaceScalarValues(point_quad_rule, cellvalues.func_interp)
+        reinit!(pml_cellvalues, cell, face)
+        q_coords = spatial_coordinate(pml_cellvalues, 1, coords)
+        if !(q_coords[2] ≈ θ) || abs(s_θ) > 1
+            pml_geom = pml.geom
+            @show q_coords, θ, ν, ζ, s_θ, θ_min, θ_max
+            error("")
+        end
+        T = dof_type(cell.dh)
+        n_basefuncs = getnbasefunctions(cellvalues)
+
+        Ke = zeros(T, n_basefuncs, n_basefuncs)
+
+        tr, J_ = tr_and_jacobian(pml, tpoint)
+        J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
+        Jₜₓₜᵣ = diagm(Tensor{2,2}, [1.0, 1/tr])
+        Jₜᵣᵣ = inv(J_pml)
+        detJₜᵣᵣ	= det(J_pml)
+        for i in 1:n_basefuncs
+            # Shape function is defined on face, we use ν to extend into the collapsed PML
+            δU = shape_value(pml_cellvalues, 1, i)
+            ∇δU = shape_gradient(pml_cellvalues, 1, i)
+            δu = δU*(1-ν)
+            ∇δu = Tensors.Vec(-δU, ∇δU[2]*(1-ν))
+
+            for j in 1:n_basefuncs
+                # Shape function is defined on face, we use ν to extend into the collapsed PML
+                U = shape_value(pml_cellvalues, 1, j)
+                ∇U = shape_gradient(pml_cellvalues, 1, j)
+                u = U*(1-ν)
+                ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
+
+                # Note there is no dΩ scaling because this is handled in the integrate function which calls this
+                Ke[i, j] += ((Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅  ∇δu) ⋅ (Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅ ∇u) - k^2*δu * u) * tr * detJₜᵣᵣ
+            end
+        end
+        return Ke
+    end
+end
+
+function pml_rip_contribution_fnc(cell, cellvalues::CellScalarValues, pml::InvHankelSeriesPML, face)
+    return (tpoint) -> begin
+        ν = tpoint.ν
+        ζ = tpoint.ζ
+        (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
+
+        coords = getcoordinates(cell)
+        θ_min, θ_max = extrema(c->c[2], coords)
+
+        # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
+        s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
+
+        # Create quad rule with a single point
+        point_quad_rule = QuadratureRule{1,RefCube,Float64}([1.0],[Tensors.Vec(s_θ)])
+        pml_cellvalues = FaceScalarValues(point_quad_rule, cellvalues.func_interp)
+        reinit!(pml_cellvalues, cell, face)
+
+        T = dof_type(cell.dh)
+        n_basefuncs = getnbasefunctions(cellvalues)
+
+        Ke = zeros(T, n_basefuncs, n_basefuncs)
+
+        tr, J_ = tr_and_jacobian(pml, tpoint)
+        dtr_dν = J_[1,1]
+        J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
+        Jₜᵣᵣ = inv(J_pml)
+        for i in 1:n_basefuncs
+            # Shape function is defined on face, we use ν to extend into the collapsed PML
+            δU = shape_value(pml_cellvalues, 1, i)
+            ∇δU = shape_gradient(pml_cellvalues, 1, i)
+            δu = δU*(1-ν)
+            ∇δu = Tensors.Vec(-δU, ∇δU[2]*(1-ν))
+
+            for j in 1:n_basefuncs
+                # Shape function is defined on face, we use ν to extend into the collapsed PML
+                U = shape_value(pml_cellvalues, 1, j)
+                ∇U = shape_gradient(pml_cellvalues, 1, j)
+                u = U*(1-ν)
+                ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
+                # Second index is ∂/∂θ, which is the normal derivative
+                Ke[i, j] += (δu * ((Jₜᵣᵣ ⋅ ∇u)[2])) * dtr_dν / tr
+            end
+        end
+        return Ke
+    end
+end
+
 function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler, pml::InvHankelSeriesPML, k::Number) where {dim}
 
     T = dof_type(dh)
@@ -147,49 +249,6 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
 
                 u_pml = PMLFieldFunction(pml)
 
-                # Used inside integrate_hcubature
-                function contribution(tpoint::TransformationPoint)
-                    ν = tpoint.ν
-                    ζ = tpoint.ζ
-                    (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
-
-                    # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
-                    # How do we know which way it is oriented?
-                    s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
-
-                    # Create quad rule with a single point
-                    point_quad_rule = QuadratureRule{1,RefCube,Float64}([1.0],[Tensors.Vec(s_θ)])
-                    pml_cellvalues = FaceScalarValues(point_quad_rule, cellvalues.func_interp)
-                    reinit!(pml_cellvalues, cell, face)
-
-                    Ke = zeros(T, n_basefuncs, n_basefuncs)
-
-                    tr, J_ = tr_and_jacobian(pml, tpoint)
-                    J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
-                    Jₜₓₜᵣ = diagm(Tensor{2,2}, [1.0, 1/tr])
-                    Jₜᵣᵣ = inv(J_pml)
-                    detJₜᵣᵣ	= det(J_pml)
-                    for i in 1:n_basefuncs
-                        # Shape function is defined on face, we use ν to extend into the collapsed PML
-                        δU = shape_value(pml_cellvalues, 1, i)
-                        ∇δU = shape_gradient(pml_cellvalues, 1, i)
-                        δu = δU*(1-ν)
-                        ∇δu = Tensors.Vec(-δU, ∇δU[2]*(1-ν))
-
-                        for j in 1:n_basefuncs
-                            # Shape function is defined on face, we use ν to extend into the collapsed PML
-                            U = shape_value(pml_cellvalues, 1, j)
-                            ∇U = shape_gradient(pml_cellvalues, 1, j)
-                            u = U*(1-ν)
-                            ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
-
-                            # Note there is no dΩ scaling because this is handled in the integrate function which calls this
-                            Ke[i, j] += ((Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅  ∇δu) ⋅ (Jₜₓₜᵣ ⋅ Jₜᵣᵣ ⋅ ∇u) - k^2*δu * u) * tr * detJₜᵣᵣ
-                        end
-                    end
-                    return Ke
-                end
-
                 intrp = interpolation(PMLFieldFunction(pml), range(θ_min, θ_max, length=3))
 
                 # If we have an actual PML element, we need to constrain dofs on
@@ -203,61 +262,21 @@ function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::D
                 # isoparametric stuff)
 
                 # Initial estimate without correction to get a rough idea of magnitude
-                Ke_est = integrate(intrp, contribution)
+                Ke_est = integrate(intrp, pml_area_contribution_fnc(cell, cellvalues, pml, face))
                 rtol=1e-8
                 atol=rtol*norm(Ke_est)
 
                 # Ke += integrate_hcubature(intrp, contribution; atol=1e-12, rtol=1e-10, maxevals=1_000)
-                Ke += integrate_hcubature(intrp, contribution; atol=rtol*norm(Ke_est), rtol, maxevals=1_000, corrector=u_pml)
+                Ke += integrate_hcubature(intrp, pml_area_contribution_fnc(cell, cellvalues, pml, face); atol=rtol*norm(Ke_est), rtol, maxevals=1_000, corrector=u_pml)
 
                 atol=rtol*norm(Ke)
-
-                # Used inside integrate_hcubature
-                function line_integrand(tpoint)
-                    ν = tpoint.ν
-                    ζ = tpoint.ζ
-                    (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
-
-                    # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
-                    s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1
-
-                    # Create quad rule with a single point
-                    point_quad_rule = QuadratureRule{1,RefCube,Float64}([1.0],[Tensors.Vec(s_θ)])
-                    pml_cellvalues = FaceScalarValues(point_quad_rule, cellvalues.func_interp)
-                    reinit!(pml_cellvalues, cell, face)
-
-                    Ke = zeros(T, n_basefuncs, n_basefuncs)
-
-                    tr, J_ = tr_and_jacobian(pml, tpoint)
-                    dtr_dν = J_[1,1]
-                    J_pml = Tensors.Tensor{2,2,ComplexF64}(J_)
-                    Jₜᵣᵣ = inv(J_pml)
-                    for i in 1:n_basefuncs
-                        # Shape function is defined on face, we use ν to extend into the collapsed PML
-                        δU = shape_value(pml_cellvalues, 1, i)
-                        ∇δU = shape_gradient(pml_cellvalues, 1, i)
-                        δu = δU*(1-ν)
-                        ∇δu = Tensors.Vec(-δU, ∇δU[2]*(1-ν))
-
-                        for j in 1:n_basefuncs
-                            # Shape function is defined on face, we use ν to extend into the collapsed PML
-                            U = shape_value(pml_cellvalues, 1, j)
-                            ∇U = shape_gradient(pml_cellvalues, 1, j)
-                            u = U*(1-ν)
-                            ∇u = Tensors.Vec(-U, ∇U[2]*(1-ν))
-                            # Second index is ∂/∂θ, which is the normal derivative
-                            Ke[i, j] += (δu * ((Jₜᵣᵣ ⋅ ∇u)[2])) * dtr_dν / tr
-                        end
-                    end
-                    return Ke
-                end
 
                 # Between each continuous region is a rip
                 for (region1, region2) in consecutive_pairs(intrp.continuous_region)
                     tν₋ = last(region1.lines)
                     tν₊ = first(region2.lines)
-                    Ke -= line_integrate_hcubature(tν₋, line_integrand; atol, rtol, maxevals=1_000, corrector=u_pml)
-                    Ke += line_integrate_hcubature(tν₊, line_integrand; atol, rtol, maxevals=1_000, corrector=u_pml)
+                    Ke -= line_integrate_hcubature(tν₋, pml_rip_contribution_fnc(cell, cellvalues, pml, face); atol, rtol, maxevals=1_000, corrector=u_pml)
+                    Ke += line_integrate_hcubature(tν₊, pml_rip_contribution_fnc(cell, cellvalues, pml, face); atol, rtol, maxevals=1_000, corrector=u_pml)
                 end
             end
         end
