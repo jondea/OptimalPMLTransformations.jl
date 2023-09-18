@@ -75,6 +75,7 @@ end
 
 import Base.push!
 function push!(intrp::Interpolation, line::InterpLine)
+    intrp.continuous_region[end].ζ₊ = line.ζ
     push!(intrp.continuous_region[end].lines, line)
 end
 
