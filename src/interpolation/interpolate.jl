@@ -2,7 +2,7 @@
 
 "Adaptively append interpolation lines to the interpolation, between first(ζs) and last(ζs) (not including end points)"
 function adaptively_append!(intrp::Interpolation, u_pml::PMLFieldFunction, ζs::AbstractVector;
-	ε=1e-1, δ=1e-8, tν_metric=relative_l2_difference,
+	ε=1e-2, δ=1e-5, tν_metric=relative_l2_difference,
 	tν₊=interpolation(u_pml, last(ζs)))::Interpolation
 
 	tν₁ = last(last(intrp.continuous_region).lines)
