@@ -151,16 +151,16 @@ if "--test_run" in ARGS
     df = leftjoin(validata, results_df; on=[:k, :u_name, :N_θ, :N_r, :N_pml, :pml, :integration], renamecols="_exact"=>"_test")
     df.assemble_time_ratio = df.assemble_time_test ./ df.assemble_time_exact
     df.solve_time_ratio = df.solve_time_test ./ df.solve_time_exact
-    df.abs_sq_error_ratio = df.abs_sq_error_test ./ df.abs_sq_error_exact
-    df.abs_sq_norm_ratio = df.abs_sq_norm_test ./ df.abs_sq_norm_exact
-    select!(df, [:k, :n_h, :N_θ, :N_r, :N_pml, :pml, :integration, :abs_sq_error_ratio, :abs_sq_norm_ratio, :assemble_time_ratio, :solve_time_ratio])
+    df.error_ratio = sqrt.(df.abs_sq_error_test ./ df.abs_sq_error_exact)
+    df.norm_ratio = sqrt.(df.abs_sq_norm_test ./ df.abs_sq_norm_exact)
+    select!(df, [:k, :u_name, :N_θ, :N_r, :N_pml, :pml, :integration, :error_ratio, :norm_ratio, :assemble_time_ratio, :solve_time_ratio])
 
     @test all(df.abs_sq_norm_ratio .≈ 1)
 
     println("Improved")
-    display(sort(filter(:abs_sq_error_ratio => <(0.999), df), :abs_sq_error_ratio))
+    display(sort(filter(:error_ratio => <(0.999), df), :error_ratio))
     println("Got worse")
-    display(sort(filter(:abs_sq_error_ratio => >(1.001), df), :abs_sq_error_ratio; rev=true))
+    display(sort(filter(:error_ratio => >(1.001), df), :error_ratio; rev=true))
 
     @test all(df.abs_sq_error_ratio .< 1.05)
 end
