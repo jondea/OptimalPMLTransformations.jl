@@ -60,6 +60,7 @@ export SingleAngularFourierMode,
        single_angular_fourier_mode
 export InvHankelPML
 
+export wavenumber
 export HankelSeries,
        two_mode_pole_coef,
        two_mode_pole_series,

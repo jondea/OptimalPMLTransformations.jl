@@ -121,6 +121,8 @@ function pml_area_contribution_fnc(cell, cellvalues::CellScalarValues, pml::InvH
         ζ = tpoint.ζ
         (;r, θ) = convert(PolarCoordinates, PMLCoordinates(ν,ζ), pml.geom)
 
+        k = wavenumber(pml)
+
         coords = getcoordinates(cell)
         θ_min, θ_max = extrema(c->c[2], coords)
 
@@ -177,6 +179,8 @@ function pml_rip_contribution_fnc(cell, cellvalues::CellScalarValues, pml::InvHa
 
         coords = getcoordinates(cell)
         θ_min, θ_max = extrema(c->c[2], coords)
+
+        k = wavenumber(pml)
 
         # If s ranges from -1 to 1, then conversion to ν should be linear 0-1 if we have 1 PML
         s_θ = 2(θ - θ_min)/(θ_max - θ_min) - 1

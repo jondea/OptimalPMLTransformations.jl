@@ -16,6 +16,8 @@ end
 
 InvHankelSeriesPML(geom, u) = InvHankelSeriesPML(geom, u, Interpolation())
 
+wavenumber(pml::InvHankelSeriesPML) = wavenumber(pml.u)
+
 PMLFieldFunction(pml::InvHankelSeriesPML) = PMLFieldFunction(pml.u, pml.geom)
 
 # Note, we can set the default range to [0,τ] because an Annular PML is a full turn.

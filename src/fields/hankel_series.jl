@@ -4,6 +4,8 @@ struct HankelSeries{KT, AT} <: AbstractFieldFunction
     a::AT
 end
 
+wavenumber(hs::HankelSeries) = hs.k
+
 import Base: +
 function +(u1::SingleAngularFourierMode, u2::SingleAngularFourierMode)
     if (u1.k != u2.k) error("wavenumbers must be the same when adding two fields") end
