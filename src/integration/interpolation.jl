@@ -54,7 +54,8 @@ function integrate_between(tν_interp0::InterpLine, tν_interp1::InterpLine, f::
     # Get knots and weights and normalise for [0,1]
     knots, weights = gausslegendreunit(order)
 
-    integral = zero(f(zero(TransformationPoint)))
+    first_patch = first(eachpatch(tν_interp0, tν_interp1))
+    integral = zero(f(first_patch(νmin(first_patch), ζmin(first_patch), corrector)) )
 
     for patch in eachpatch(tν_interp0, tν_interp1)
 
@@ -95,8 +96,8 @@ end
 
 function integrate_between_hcubature(tν_interp0::InterpLine, tν_interp1::InterpLine, f::Function; corrector=nothing, kwargs...)
 
-    integral = zero(f(zero(TransformationPoint)))
-
+    first_patch = first(eachpatch(tν_interp0, tν_interp1))
+    integral = zero(f(first_patch(νmin(first_patch), ζmin(first_patch), corrector)))
     for patch in eachpatch(tν_interp0, tν_interp1)
         integrand_fnc(νζ) = f(patch(νζ[1], νζ[2], corrector))
         integral += hcubature(integrand_fnc, SA[νmin(patch), ζmin(patch)], SA[νmax(patch), ζmax(patch)]; kwargs...)[1]
