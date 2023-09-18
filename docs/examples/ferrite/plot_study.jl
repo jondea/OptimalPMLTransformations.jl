@@ -22,15 +22,15 @@ end
 # ╔═╡ 2b596f50-292a-4531-80b0-f8137be74330
 using Colors
 
-# ╔═╡ 402e7616-6d79-4c67-bcf3-714c7d212c64
-using StatsPlots
-
 # ╔═╡ 1d224f48-66b6-4117-aae2-bd64d58c0809
 begin
 	using Plots
 	import PlotlyJS
 	plotlyjs()
 end
+
+# ╔═╡ 402e7616-6d79-4c67-bcf3-714c7d212c64
+using StatsPlots
 
 # ╔═╡ 21e2e69e-e682-11ed-1114-8db0de77ceba
 using DataFrames
@@ -59,12 +59,8 @@ md"""
 
 Zeroth and third Hankel mode works perfectly.
 
-Scattered field works for $k=1$, which is great, because this is non-uniform in θ (although no rips).
-However, the ones with rips $k=0.1$ and $k=10$, are broken.
-From the way that it jumps around, I think it may be missing some rips in some case.
-Will investigate further.
+Scattered field works for $k=1$, which is great, because they are non-uniform in θ and $k=10$ has rip! Unfortunately, $k=0.1$ appears to start losing accuracy at around $10^{-4}$ when compared to SFB, however, this is much improved from last time!
 
-All over, the parameter study has been useful!
 """
 
 # ╔═╡ ffc5f6d0-790f-404c-bf80-c76f566cdd78
@@ -115,7 +111,7 @@ html"<div style='height: 30vh'></div>"
 md"# Appendix"
 
 # ╔═╡ 36a21f25-a23c-4de9-9334-c21c50bf0688
-df = CSV.read("study_2023-07-12_00-11-51/result.csv", DataFrame)
+df = CSV.read("study_2023-09-18_14-06-58/result.csv", DataFrame)
 
 # ╔═╡ 544b0416-e7e3-4938-b502-61e606fb6d56
 invh_df = let
@@ -304,7 +300,7 @@ StatsPlots = "~0.15.5"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.0"
+julia_version = "1.9.2"
 manifest_format = "2.0"
 project_hash = "91b8d615d0be34d9c20d24d6ce0b65d044d27a04"
 
@@ -463,7 +459,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.2+0"
+version = "1.0.5+0"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -1142,7 +1138,7 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.9.0"
+version = "1.9.2"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -1736,7 +1732,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.7.0+0"
+version = "5.8.0+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
