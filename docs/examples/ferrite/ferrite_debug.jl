@@ -1,4 +1,4 @@
-
+using Revise
 begin
     import Pkg
     # activate the shared project environment
@@ -28,11 +28,10 @@ using PMLFerriteExtensions
 include("pml_helmholtz_polar_annulus_assembly.jl")
 
 k = 0.1
-n_h = 0
 R = 2.0
-N_θ = 2
+N_θ = 16
 N_pml = 0
-N_r = 2
+N_r = 50
 
 int_order = 2
 δ_pml = 1.0
@@ -40,11 +39,16 @@ cylinder_radius = 1.0
 nqr_1d = 2*(int_order + 1)
 bulk_qr = QuadratureRule{2, RefCube}(nqr_1d)
 pml_qr = QuadratureRule{2, RefCube}(nqr_1d)
+
+n_h = 3
 # u_ana=HankelSeries(k, OffsetVector([1.0], n_h:n_h))
 # u_ana=two_mode_pole_series(k, R + (1.0+1.0im))
 u_ana = HankelSeries(k, scattered_coef(-10:10, k))
 
 pml = InvHankelSeriesPML(AnnularPML(R, δ_pml), u_ana)
+# pml = SFB(AnnularPML(R, δ_pml), k)
 u_pml = PMLFieldFunction(u_ana, pml.geom)
 
 solve(PMLHelmholtzPolarAnnulusParams(;k, N_θ, N_r, N_pml, cylinder_radius, R, δ_pml, u_ana, order=int_order, pml, bulk_qr, pml_qr); save_vtk=true)
+
+# points_slice = filter(p->p.ζ<=τ/N_θ, POINTS)
